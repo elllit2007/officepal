@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import Kollegan from "@/components/Kollegan";
 import type { KollegState } from "@/components/Kollegan";
 import type { InvoiceDraft, Quote } from "@/lib/types";
@@ -10,6 +11,7 @@ import { formatSEK } from "./lib/format";
 import InvoiceDraftList from "./components/InvoiceDraftList";
 import QuoteList from "./components/QuoteList";
 import FieldReportList from "./components/FieldReportList";
+import ListSkeleton from "./components/ListSkeleton";
 
 const DONE_ANIMATION_MS = 1800;
 
@@ -60,11 +62,13 @@ function buildAskingMessage(pending: PendingItem[]): string | undefined {
 }
 
 export default function AdminDashboardPage() {
-  const { invoiceDrafts, quotes, fieldReports, loading, error, refresh } = useDashboardData();
+  const { invoiceDrafts, quotes, fieldReports, loading, refreshing, error, refresh } =
+    useDashboardData();
   const [transientDone, setTransientDone] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const inFlightRef = useRef(false);
 
   const pendingItems = useMemo(
     () => toPendingItems(invoiceDrafts, quotes),
@@ -83,6 +87,10 @@ export default function AdminDashboardPage() {
       action: "approve" | "reject" | "edit",
       patch?: { customer_name: string; amount: number } | { customer_name: string; content: string },
     ) => {
+      // Pratbubblans knappar (Kollegan, Track 5) har ingen disabled-prop, så
+      // dubbelklick under pågående anrop stoppas här istället.
+      if (inFlightRef.current) return;
+      inFlightRef.current = true;
       setBusyId(target.id);
       setActionError(null);
       try {
@@ -114,6 +122,7 @@ export default function AdminDashboardPage() {
       } catch (err) {
         setActionError(err instanceof Error ? err.message : "Något gick fel.");
       } finally {
+        inFlightRef.current = false;
         setBusyId(null);
       }
     },
@@ -140,14 +149,27 @@ export default function AdminDashboardPage() {
   return (
     <main className="min-h-full bg-[#F5F8FF]">
       <div className="mx-auto flex max-w-4xl flex-col gap-10 px-6 py-10">
-        <header className="flex flex-col gap-1">
-          <div className="flex items-center justify-between gap-3">
+        <header className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex flex-col gap-1">
             <h1 className="text-2xl font-semibold text-[#1E3A8A]">Adminpanel</h1>
+            <p className="text-sm text-neutral-500">
+              Översikt över det som väntar på ditt godkännande.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            {refreshing && (
+              <span aria-hidden="true" className="text-xs text-neutral-400">
+                Uppdaterar…
+              </span>
+            )}
+            <Link
+              href="/admin/logg"
+              className="rounded-full border border-blue-200 bg-white px-4 py-1.5 text-sm font-medium text-[#1E3A8A] hover:bg-blue-50"
+            >
+              Beslutslogg
+            </Link>
             <LogoutButton />
           </div>
-          <p className="text-sm text-neutral-500">
-            Översikt över det som väntar på ditt godkännande.
-          </p>
         </header>
 
         <section className="flex flex-col items-center gap-4 rounded-2xl border border-blue-100 bg-white py-10">
@@ -172,14 +194,20 @@ export default function AdminDashboardPage() {
           </p>
         )}
 
-        {loading ? (
-          <p className="text-sm text-neutral-500">Laddar…</p>
-        ) : (
-          <div className="flex flex-col gap-8">
-            <section className="flex flex-col gap-3">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1E3A8A]">
-                Fakturautkast som väntar
-              </h2>
+        <div
+          aria-busy={loading || refreshing}
+          className="flex flex-col gap-8"
+        >
+          <p role="status" aria-live="polite" className="sr-only">
+            {loading ? "Laddar…" : refreshing ? "Uppdaterar…" : ""}
+          </p>
+          <section className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1E3A8A]">
+              Fakturautkast som väntar
+            </h2>
+            {loading ? (
+              <ListSkeleton rows={2} />
+            ) : (
               <InvoiceDraftList
                 invoiceDrafts={invoiceDrafts}
                 highlightedId={highlightedId}
@@ -198,12 +226,16 @@ export default function AdminDashboardPage() {
                   )
                 }
               />
-            </section>
+            )}
+          </section>
 
-            <section className="flex flex-col gap-3">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1E3A8A]">
-                Offerter som väntar på godkännande
-              </h2>
+          <section className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1E3A8A]">
+              Offerter som väntar på godkännande
+            </h2>
+            {loading ? (
+              <ListSkeleton rows={1} />
+            ) : (
               <QuoteList
                 quotes={quotes}
                 highlightedId={highlightedId}
@@ -218,16 +250,16 @@ export default function AdminDashboardPage() {
                   runAction({ kind: "quote", id: quote.id, tenant_id: quote.tenant_id }, "edit", patch)
                 }
               />
-            </section>
+            )}
+          </section>
 
-            <section className="flex flex-col gap-3">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1E3A8A]">
-                Senaste fältrapporter
-              </h2>
-              <FieldReportList fieldReports={fieldReports} />
-            </section>
-          </div>
-        )}
+          <section className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1E3A8A]">
+              Senaste fältrapporter
+            </h2>
+            {loading ? <ListSkeleton rows={3} /> : <FieldReportList fieldReports={fieldReports} />}
+          </section>
+        </div>
       </div>
     </main>
   );

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { InvoiceDraft } from "@/lib/types";
 import StatusBadge from "./StatusBadge";
+import EmptyState from "./EmptyState";
 import { formatSEK, formatDateTime } from "../lib/format";
 
 interface InvoiceDraftListProps {
@@ -40,7 +41,12 @@ export default function InvoiceDraftList({
   };
 
   if (invoiceDrafts.length === 0) {
-    return <p className="text-sm text-neutral-500">Inga fakturautkast väntar på godkännande.</p>;
+    return (
+      <EmptyState
+        title="Inga fakturautkast väntar just nu."
+        hint="När en fältrapport har bearbetats dyker fakturautkastet upp här för ditt godkännande."
+      />
+    );
   }
 
   return (

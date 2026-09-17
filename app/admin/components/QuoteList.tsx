@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Quote } from "@/lib/types";
 import StatusBadge from "./StatusBadge";
+import EmptyState from "./EmptyState";
 import { formatDateTime } from "../lib/format";
 
 interface QuoteListProps {
@@ -39,7 +40,12 @@ export default function QuoteList({
   };
 
   if (quotes.length === 0) {
-    return <p className="text-sm text-neutral-500">Inga offerter väntar på godkännande just nu.</p>;
+    return (
+      <EmptyState
+        title="Inga offerter väntar just nu."
+        hint="Offertutkast som behöver ditt godkännande innan de skickas visas här."
+      />
+    );
   }
 
   return (
