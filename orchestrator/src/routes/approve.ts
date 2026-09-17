@@ -24,6 +24,16 @@ const bodySchema = z.object({
  * is simply cleared to send — Track 6 sets status: 'sent' later), but it
  * does have "rejected", so a rejection transitions quotes.status; an
  * approval does not.
+ *
+ * Status transitions use a conditional update (`.eq("status", <expected>)`)
+ * rather than a separate fetch-then-write, so two concurrent /approve calls
+ * for the same target can't both pass a stale read and both write — only
+ * one update actually matches a row; the other gets back no row and 409s.
+ * Quote approval has no status transition to gate on, so a second
+ * concurrent "approved" call for the same quote isn't caught this way —
+ * acceptable for a single-admin pilot; would need a DB-level unique
+ * constraint on approvals(target_type, target_id) to close fully, which is
+ * a supabase/schema.sql change outside this track's scope.
  */
 export async function approve(req: Request, res: Response) {
   const parsed = bodySchema.safeParse(req.body);
@@ -33,52 +43,71 @@ export async function approve(req: Request, res: Response) {
   const { tenant_id, target_type, target_id, action, decided_by } = parsed.data;
 
   if (target_type === "invoice_draft") {
-    const { data: draft, error: fetchError } = await supabase
-      .from("invoice_drafts")
-      .select("id, tenant_id, status")
-      .eq("id", target_id)
-      .maybeSingle();
-
-    if (fetchError) return res.status(500).json({ error: "lookup_failed", message: fetchError.message });
-    if (!draft) return res.status(404).json({ error: "invoice_draft_not_found" });
-    if (draft.tenant_id !== tenant_id) return res.status(403).json({ error: "tenant_mismatch" });
-    if (draft.status !== "awaiting_approval") {
-      return res.status(409).json({ error: "not_awaiting_approval", status: draft.status });
-    }
-
-    const { error: updateError } = await supabase
+    const { data: updated, error: updateError } = await supabase
       .from("invoice_drafts")
       .update({ status: action })
-      .eq("id", target_id);
+      .eq("id", target_id)
+      .eq("tenant_id", tenant_id)
+      .eq("status", "awaiting_approval")
+      .select("id")
+      .maybeSingle();
 
     if (updateError) {
       return res.status(500).json({ error: "update_failed", message: updateError.message });
     }
-  } else {
-    const { data: quote, error: fetchError } = await supabase
-      .from("quotes")
-      .select("id, tenant_id, status")
-      .eq("id", target_id)
-      .maybeSingle();
+    if (!updated) {
+      const { data: draft } = await supabase
+        .from("invoice_drafts")
+        .select("id, tenant_id, status")
+        .eq("id", target_id)
+        .maybeSingle();
 
-    if (fetchError) return res.status(500).json({ error: "lookup_failed", message: fetchError.message });
-    if (!quote) return res.status(404).json({ error: "quote_not_found" });
-    if (quote.tenant_id !== tenant_id) return res.status(403).json({ error: "tenant_mismatch" });
-    if (quote.status !== "draft") {
-      return res.status(409).json({ error: "not_awaiting_approval", status: quote.status });
+      if (!draft) return res.status(404).json({ error: "invoice_draft_not_found" });
+      if (draft.tenant_id !== tenant_id) return res.status(403).json({ error: "tenant_mismatch" });
+      return res.status(409).json({ error: "not_awaiting_approval", status: draft.status });
     }
-
+  } else {
     if (action === "rejected") {
-      const { error: updateError } = await supabase
+      const { data: updated, error: updateError } = await supabase
         .from("quotes")
         .update({ status: "rejected" })
-        .eq("id", target_id);
+        .eq("id", target_id)
+        .eq("tenant_id", tenant_id)
+        .eq("status", "draft")
+        .select("id")
+        .maybeSingle();
 
       if (updateError) {
         return res.status(500).json({ error: "update_failed", message: updateError.message });
       }
+      if (!updated) {
+        const { data: quote } = await supabase
+          .from("quotes")
+          .select("id, tenant_id, status")
+          .eq("id", target_id)
+          .maybeSingle();
+
+        if (!quote) return res.status(404).json({ error: "quote_not_found" });
+        if (quote.tenant_id !== tenant_id) return res.status(403).json({ error: "tenant_mismatch" });
+        return res.status(409).json({ error: "not_awaiting_approval", status: quote.status });
+      }
+    } else {
+      // action === "approved": no status transition to gate on (see doc
+      // comment above) — just verify the quote exists and belongs to this
+      // tenant before logging the decision.
+      const { data: quote, error: fetchError } = await supabase
+        .from("quotes")
+        .select("id, tenant_id, status")
+        .eq("id", target_id)
+        .maybeSingle();
+
+      if (fetchError) return res.status(500).json({ error: "lookup_failed", message: fetchError.message });
+      if (!quote) return res.status(404).json({ error: "quote_not_found" });
+      if (quote.tenant_id !== tenant_id) return res.status(403).json({ error: "tenant_mismatch" });
+      if (quote.status !== "draft") {
+        return res.status(409).json({ error: "not_awaiting_approval", status: quote.status });
+      }
     }
-    // action === "approved": stays "draft" — cleared to send, no distinct status.
   }
 
   await logDecision({
