@@ -216,6 +216,9 @@ export const motion = {
   easing: {
     out: "cubic-bezier(0.2, 0, 0, 1)",
     inOut: "cubic-bezier(0.4, 0, 0.2, 1)",
+    /** Samma kurvor i arrayform för Framer Motion (`ease: [...]`). */
+    outCurve: [0.2, 0, 0, 1] as const,
+    inOutCurve: [0.4, 0, 0.2, 1] as const,
     /** Framer Motion-fjäder för Kollegan och pratbubblor. */
     spring: { type: "spring", stiffness: 320, damping: 26 } as const,
     springSoft: { type: "spring", stiffness: 200, damping: 22 } as const,
