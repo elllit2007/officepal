@@ -50,6 +50,7 @@ create table if not exists public.tenants (
   settings   jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
+  customer_email TEXT,
 
 alter table public.tenants enable row level security;
 
@@ -137,6 +138,7 @@ create table if not exists public.invoice_drafts (
   tenant_id        uuid not null references public.tenants(id) on delete cascade,
   field_report_id  uuid references public.field_reports(id) on delete set null,
   customer_name    text not null,
+  customer_email   text,
   amount           numeric(12, 2) not null,
   line_items       jsonb not null default '[]'::jsonb,
   status           text not null default 'awaiting_approval'
@@ -174,6 +176,7 @@ create table if not exists public.quotes (
   id            uuid primary key default gen_random_uuid(),
   tenant_id     uuid not null references public.tenants(id) on delete cascade,
   customer_name text not null,
+  customer_email text,
   content       text not null,
   status        text not null default 'draft'
                 check (status in ('draft', 'sent', 'followed_up', 'accepted', 'expired')),
