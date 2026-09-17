@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Kollegan from "@/components/Kollegan";
 import type { KollegState } from "@/components/Kollegan";
-import type { InvoiceDraft } from "@/lib/types";
+import type { InvoiceDraft, Quote } from "@/lib/types";
 import { useDashboardData } from "./lib/useDashboardData";
 import { formatSEK } from "./lib/format";
 import InvoiceDraftList from "./components/InvoiceDraftList";
@@ -12,13 +12,50 @@ import FieldReportList from "./components/FieldReportList";
 
 const DONE_ANIMATION_MS = 1800;
 
-function buildAskingMessage(pending: InvoiceDraft[]): string | undefined {
+type PendingKind = "invoice_draft" | "quote";
+
+interface PendingItem {
+  kind: PendingKind;
+  id: string;
+  tenant_id: string;
+  created_at: string;
+  customer_name: string;
+  amount?: number;
+}
+
+function toPendingItems(invoiceDrafts: InvoiceDraft[], quotes: Quote[]): PendingItem[] {
+  return [
+    ...invoiceDrafts.map((draft) => ({
+      kind: "invoice_draft" as const,
+      id: draft.id,
+      tenant_id: draft.tenant_id,
+      created_at: draft.created_at,
+      customer_name: draft.customer_name,
+      amount: draft.amount,
+    })),
+    ...quotes.map((quote) => ({
+      kind: "quote" as const,
+      id: quote.id,
+      tenant_id: quote.tenant_id,
+      created_at: quote.created_at,
+      customer_name: quote.customer_name,
+    })),
+  ].sort((a, b) => a.created_at.localeCompare(b.created_at));
+}
+
+function describePendingItem(item: PendingItem): string {
+  return item.kind === "invoice_draft"
+    ? `Fakturautkast till ${item.customer_name} (${formatSEK(item.amount ?? 0)})`
+    : `Offert till ${item.customer_name}`;
+}
+
+function buildAskingMessage(pending: PendingItem[]): string | undefined {
   if (pending.length === 0) return undefined;
   const [first] = pending;
   if (pending.length === 1) {
-    return `Fakturautkast till ${first.customer_name} (${formatSEK(first.amount)}) väntar på ditt godkännande.`;
+    return `${describePendingItem(first)} väntar på ditt godkännande.`;
   }
-  return `${pending.length} fakturor väntar på godkännande. Först ut: ${first.customer_name} (${formatSEK(first.amount)}).`;
+  return `${pending.length} ärenden väntar på godkännande. Först ut: ${describePendingItem(first)}.`;
 }
 
 export default function AdminDashboardPage() {
@@ -28,24 +65,33 @@ export default function AdminDashboardPage() {
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  const pendingItems = useMemo(
+    () => toPendingItems(invoiceDrafts, quotes),
+    [invoiceDrafts, quotes],
+  );
+
   const kollegState: KollegState = transientDone
     ? "done"
-    : invoiceDrafts.length > 0
+    : pendingItems.length > 0
       ? "asking"
       : "idle";
 
   const runAction = useCallback(
-    async (draft: InvoiceDraft, action: "approve" | "reject" | "edit", patch?: { customer_name: string; amount: number }) => {
-      setBusyId(draft.id);
+    async (
+      target: { kind: PendingKind; id: string; tenant_id: string },
+      action: "approve" | "reject" | "edit",
+      patch?: { customer_name: string; amount: number },
+    ) => {
+      setBusyId(target.id);
       setActionError(null);
       try {
         const res = await fetch("/api/approvals", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            targetType: "invoice_draft",
-            targetId: draft.id,
-            tenantId: draft.tenant_id,
+            targetType: target.kind,
+            targetId: target.id,
+            tenantId: target.tenant_id,
             action,
             patch,
           }),
@@ -71,21 +117,21 @@ export default function AdminDashboardPage() {
   );
 
   const handleBubbleApprove = useCallback(() => {
-    if (invoiceDrafts[0]) runAction(invoiceDrafts[0], "approve");
-  }, [invoiceDrafts, runAction]);
+    if (pendingItems[0]) runAction(pendingItems[0], "approve");
+  }, [pendingItems, runAction]);
 
   const handleBubbleReject = useCallback(() => {
-    if (invoiceDrafts[0]) runAction(invoiceDrafts[0], "reject");
-  }, [invoiceDrafts, runAction]);
+    if (pendingItems[0]) runAction(pendingItems[0], "reject");
+  }, [pendingItems, runAction]);
 
   const handleBubbleEdit = useCallback(() => {
-    if (!invoiceDrafts[0]) return;
-    setHighlightedId(invoiceDrafts[0].id);
-    document
-      .getElementById(`invoice-draft-${invoiceDrafts[0].id}`)
-      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const first = pendingItems[0];
+    if (!first) return;
+    setHighlightedId(first.id);
+    const domId = first.kind === "invoice_draft" ? `invoice-draft-${first.id}` : `quote-${first.id}`;
+    document.getElementById(domId)?.scrollIntoView({ behavior: "smooth", block: "center" });
     setTimeout(() => setHighlightedId(null), 2000);
-  }, [invoiceDrafts]);
+  }, [pendingItems]);
 
   return (
     <main className="min-h-full bg-[#F5F8FF]">
@@ -101,7 +147,7 @@ export default function AdminDashboardPage() {
           <Kollegan
             state={kollegState}
             size="large"
-            message={buildAskingMessage(invoiceDrafts)}
+            message={buildAskingMessage(pendingItems)}
             onApprove={handleBubbleApprove}
             onEdit={handleBubbleEdit}
             onReject={handleBubbleReject}
@@ -131,9 +177,19 @@ export default function AdminDashboardPage() {
                 invoiceDrafts={invoiceDrafts}
                 highlightedId={highlightedId}
                 busyId={busyId}
-                onApprove={(draft) => runAction(draft, "approve")}
-                onReject={(draft) => runAction(draft, "reject")}
-                onEdit={(draft, patch) => runAction(draft, "edit", patch)}
+                onApprove={(draft) =>
+                  runAction({ kind: "invoice_draft", id: draft.id, tenant_id: draft.tenant_id }, "approve")
+                }
+                onReject={(draft) =>
+                  runAction({ kind: "invoice_draft", id: draft.id, tenant_id: draft.tenant_id }, "reject")
+                }
+                onEdit={(draft, patch) =>
+                  runAction(
+                    { kind: "invoice_draft", id: draft.id, tenant_id: draft.tenant_id },
+                    "edit",
+                    patch,
+                  )
+                }
               />
             </section>
 
@@ -141,7 +197,17 @@ export default function AdminDashboardPage() {
               <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1E3A8A]">
                 Offerter som väntar på godkännande
               </h2>
-              <QuoteList quotes={quotes} />
+              <QuoteList
+                quotes={quotes}
+                highlightedId={highlightedId}
+                busyId={busyId}
+                onApprove={(quote) =>
+                  runAction({ kind: "quote", id: quote.id, tenant_id: quote.tenant_id }, "approve")
+                }
+                onReject={(quote) =>
+                  runAction({ kind: "quote", id: quote.id, tenant_id: quote.tenant_id }, "reject")
+                }
+              />
             </section>
 
             <section className="flex flex-col gap-3">
