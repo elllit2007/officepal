@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import Kollegan from "@/components/Kollegan";
 import type { KollegState } from "@/components/Kollegan";
 import type { InvoiceDraft, Quote } from "@/lib/types";
+import LogoutButton from "@/app/auth/components/LogoutButton";
 import { useDashboardData } from "./lib/useDashboardData";
 import { formatSEK } from "./lib/format";
 import InvoiceDraftList from "./components/InvoiceDraftList";
@@ -140,7 +141,10 @@ export default function AdminDashboardPage() {
     <main className="min-h-full bg-[#F5F8FF]">
       <div className="mx-auto flex max-w-4xl flex-col gap-10 px-6 py-10">
         <header className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold text-[#1E3A8A]">Adminpanel</h1>
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="text-2xl font-semibold text-[#1E3A8A]">Adminpanel</h1>
+            <LogoutButton />
+          </div>
           <p className="text-sm text-neutral-500">
             Översikt över det som väntar på ditt godkännande.
           </p>
