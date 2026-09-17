@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import type { Database, InvoiceDraftStatus } from "@/lib/types";
+import type { InvoiceDraftStatus } from "@/lib/types";
+import type { SupabaseDatabase } from "@/app/admin/lib/supabaseDatabase";
 
 // TODO(Track 2): detta är en tillfällig stub för admin-dashboarden (Track 4).
 // Skriv om till att anropa orchestratorns POST /approve-endpoint istället för
@@ -19,7 +20,7 @@ function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceRoleKey) return null;
-  return createClient<Database>(url, serviceRoleKey);
+  return createClient<SupabaseDatabase>(url, serviceRoleKey);
 }
 
 export async function POST(request: Request) {
@@ -76,6 +77,9 @@ export async function POST(request: Request) {
     target_type: "invoice_draft",
     target_id: targetId,
     action: newStatus === "approved" ? "approved" : "rejected",
+    // TODO(Track 7): sätt till den inloggade adminanvändarens auth.uid() när
+    // inloggning finns på plats istället för null.
+    decided_by: null,
   });
 
   if (approvalError) {

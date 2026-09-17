@@ -4,7 +4,7 @@ import { formatDateTime } from "../lib/format";
 
 export default function QuoteList({ quotes }: { quotes: Quote[] }) {
   if (quotes.length === 0) {
-    return <p className="text-sm text-neutral-500">Inga offerter i utkast just nu.</p>;
+    return <p className="text-sm text-neutral-500">Inga offerter väntar på godkännande just nu.</p>;
   }
 
   return (

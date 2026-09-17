@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/types";
+import type { SupabaseDatabase } from "./supabaseDatabase";
 
 // Track 4 (admin) — läser data direkt från klienten med anon-nyckeln.
 // RLS scopar detta mot inloggad tenant (se supabase/SETUP.md). Innan Track 7:s
@@ -10,7 +10,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
-export const supabase = createClient<Database>(
+export const supabase = createClient<SupabaseDatabase>(
   supabaseUrl ?? "https://placeholder.supabase.co",
   supabaseAnonKey ?? "placeholder-anon-key",
 );

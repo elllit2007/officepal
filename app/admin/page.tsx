@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import Kollegan from "@/components/Kollegan";
 import type { KollegState } from "@/components/Kollegan";
 import type { InvoiceDraft } from "@/lib/types";
@@ -23,22 +23,16 @@ function buildAskingMessage(pending: InvoiceDraft[]): string | undefined {
 
 export default function AdminDashboardPage() {
   const { invoiceDrafts, quotes, fieldReports, loading, error, refresh } = useDashboardData();
-  const [kollegState, setKollegState] = useState<KollegState>("idle");
+  const [transientDone, setTransientDone] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const pendingCountRef = useRef(invoiceDrafts.length);
-  useEffect(() => {
-    pendingCountRef.current = invoiceDrafts.length;
-  }, [invoiceDrafts.length]);
-
-  useEffect(() => {
-    setKollegState((current) => {
-      if (current === "done") return current;
-      return invoiceDrafts.length > 0 ? "asking" : "idle";
-    });
-  }, [invoiceDrafts.length]);
+  const kollegState: KollegState = transientDone
+    ? "done"
+    : invoiceDrafts.length > 0
+      ? "asking"
+      : "idle";
 
   const runAction = useCallback(
     async (draft: InvoiceDraft, action: "approve" | "reject" | "edit", patch?: { customer_name: string; amount: number }) => {
@@ -61,13 +55,11 @@ export default function AdminDashboardPage() {
           throw new Error(body.error ?? "Något gick fel.");
         }
 
-        await refresh();
+        refresh();
 
         if (action !== "edit") {
-          setKollegState("done");
-          setTimeout(() => {
-            setKollegState(pendingCountRef.current > 0 ? "asking" : "idle");
-          }, DONE_ANIMATION_MS);
+          setTransientDone(true);
+          setTimeout(() => setTransientDone(false), DONE_ANIMATION_MS);
         }
       } catch (err) {
         setActionError(err instanceof Error ? err.message : "Något gick fel.");
@@ -147,7 +139,7 @@ export default function AdminDashboardPage() {
 
             <section className="flex flex-col gap-3">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1E3A8A]">
-                Offerter i utkast
+                Offerter som väntar på godkännande
               </h2>
               <QuoteList quotes={quotes} />
             </section>
