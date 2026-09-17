@@ -10,32 +10,42 @@ interface WritingToolResultPayload {
   tenant_id: string;
 }
 
+function isValidPayload(parsed: unknown): parsed is WritingToolResultPayload {
+  return (
+    !!parsed &&
+    typeof parsed === "object" &&
+    typeof (parsed as Record<string, unknown>).decision === "string" &&
+    typeof (parsed as Record<string, unknown>).target_type === "string" &&
+    typeof (parsed as Record<string, unknown>).target_id === "string" &&
+    typeof (parsed as Record<string, unknown>).tenant_id === "string"
+  );
+}
+
 function parsePayload(toolResponse: unknown): WritingToolResultPayload | null {
-  // MCP CallToolResult shape: { content: [{ type: 'text', text: '...json...' }], isError?: boolean }
+  // MCP CallToolResult shape: { content: [{ type: 'text', text: '...json...' }, ...], isError?: boolean }
+  //
+  // The writing tools (create_invoice_draft, create_quote_draft) emit the
+  // audit envelope (decision/target_type/target_id/tenant_id) as its own
+  // small, fixed-shape text block, kept separate from a second block
+  // carrying the full (potentially large/free-text) record — see those
+  // tools' return statements. We don't assume which index the envelope
+  // lands at; scan every text block and use the first one that parses into
+  // a valid envelope.
   if (
     toolResponse &&
     typeof toolResponse === "object" &&
     "content" in toolResponse &&
     Array.isArray((toolResponse as { content: unknown }).content)
   ) {
-    const first = (toolResponse as { content: unknown[] }).content[0];
-    if (
-      first &&
-      typeof first === "object" &&
-      "text" in (first as Record<string, unknown>)
-    ) {
+    for (const block of (toolResponse as { content: unknown[] }).content) {
+      if (!block || typeof block !== "object" || !("text" in block)) continue;
+      const text = (block as { text: unknown }).text;
+      if (typeof text !== "string") continue;
       try {
-        const parsed = JSON.parse((first as { text: string }).text);
-        if (
-          typeof parsed.decision === "string" &&
-          typeof parsed.target_type === "string" &&
-          typeof parsed.target_id === "string" &&
-          typeof parsed.tenant_id === "string"
-        ) {
-          return parsed as WritingToolResultPayload;
-        }
+        const parsed = JSON.parse(text);
+        if (isValidPayload(parsed)) return parsed;
       } catch {
-        return null;
+        // not this block's job — keep scanning the rest
       }
     }
   }
@@ -60,8 +70,18 @@ export const logToolOutcomeHook: HookCallback = async (input) => {
 
   const payload = parsePayload(event.tool_response);
   if (!payload) {
+    // Dump the raw shape (truncated) so a recurrence is diagnosable straight
+    // from fly logs instead of needing a live repro — this is what was
+    // missing when this warning was first seen for create_quote_draft.
+    let rawShape: string;
+    try {
+      rawShape = JSON.stringify(event.tool_response).slice(0, 2000);
+    } catch {
+      rawShape = String(event.tool_response).slice(0, 2000);
+    }
     logger.warn("logToolOutcomeHook: could not parse writing tool result, skipping audit log", {
       tool_name: event.tool_name,
+      raw_tool_response: rawShape,
     });
     return {};
   }

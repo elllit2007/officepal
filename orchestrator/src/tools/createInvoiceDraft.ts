@@ -91,16 +91,21 @@ export const createInvoiceDraftTool = tool(
     return {
       content: [
         {
+          // Audit envelope first, kept small and fixed-shape, separate from
+          // the (unbounded-in-principle) line_items detail below — see
+          // src/hooks/logToolOutcome.ts and the matching split in
+          // create_quote_draft.
           type: "text",
           text: JSON.stringify({
-            invoice_draft: invoiceDraft,
-            trust_level: level,
-            // Consumed by the PostToolUse audit hook (src/hooks/logToolOutcome.ts).
             decision: autonomous ? "approved" : "awaiting",
             target_type: "invoice_draft",
             target_id: invoiceDraft.id,
             tenant_id: args.tenant_id,
           }),
+        },
+        {
+          type: "text",
+          text: JSON.stringify({ invoice_draft: invoiceDraft, trust_level: level }),
         },
       ],
     };

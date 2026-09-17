@@ -56,15 +56,23 @@ export const createQuoteDraftTool = tool(
     return {
       content: [
         {
+          // Audit envelope first, and deliberately kept small and fixed-shape
+          // (see src/hooks/logToolOutcome.ts) — content.content below is
+          // unbounded model-supplied free text (no length cap in schemas.ts),
+          // unlike create_invoice_draft's compact structured line_items.
+          // Keeping the two apart means the audit trail can't be broken by
+          // however large/unusual the free text turns out to be.
           type: "text",
           text: JSON.stringify({
-            quote,
-            trust_level: level,
             decision: autonomous ? "approved" : "awaiting",
             target_type: "quote",
             target_id: quote.id,
             tenant_id: args.tenant_id,
           }),
+        },
+        {
+          type: "text",
+          text: JSON.stringify({ quote, trust_level: level }),
         },
       ],
     };
