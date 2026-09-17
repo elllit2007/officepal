@@ -18,7 +18,7 @@ const EMPTY: DashboardData = { invoiceDrafts: [], quotes: [], fieldReports: [] }
  * betyder alltså: den SENASTE raden per (target_type, target_id) har
  * action = "awaiting".
  */
-function pendingTargetIds(approvals: Approval[], targetType: string): string[] {
+export function pendingTargetIds(approvals: Approval[], targetType: string): string[] {
   const latestByTarget = new Map<string, Approval>();
   for (const approval of approvals) {
     if (approval.target_type !== targetType) continue;
