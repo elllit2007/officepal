@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import type { FieldReportInsert, Staff } from "@/lib/types";
+import type { Staff } from "@/lib/types";
+import { processReport, OrchestratorRequestError } from "@/lib/orchestrator-client";
 
 // Track 3 (Fältrapport) — se BUILD-CONTRACT.md.
 //
 // Fältpersonal har ingen Supabase Auth-session (se staff.access_code i
 // supabase/SETUP.md), så den här routen kör server-side med service-role-
-// nyckeln, validerar access_code manuellt och kringgår därmed RLS med
-// avsikt — precis det mönster SETUP.md beskriver för fältrapport-API:t.
+// nyckeln och validerar access_code manuellt — det är fortfarande denna
+// routens jobb (orkestratorn känner inte till access_code). Själva
+// fältrapport-bearbetningen (spara + extrahera + skapa utkast) sker nu i
+// orkestratorn via lib/orchestrator-client, se Track 8.
 //
 // OBS: createClient tas medvetet UTAN Database-generic här. lib/types.ts
 // Database-typ saknar för närvarande Views/Functions/Relationships som
@@ -100,39 +103,30 @@ export async function POST(request: Request) {
     );
   }
 
-  const insertPayload: FieldReportInsert = {
-    tenant_id: staff.tenant_id,
-    staff_id: staff.id,
-    raw_text: rawText,
-    status: "pending",
-  };
-
-  const { data: reportData, error: insertError } = await supabase
-    .from("field_reports")
-    .insert(insertPayload)
-    .select("id")
-    .single();
-
-  const report = reportData as { id: string } | null;
-
-  if (insertError || !report) {
-    console.error(insertError);
+  let result;
+  try {
+    result = await processReport({
+      tenant_id: staff.tenant_id,
+      staff_id: staff.id,
+      raw_text: rawText,
+    });
+  } catch (err) {
+    console.error(err);
+    if (err instanceof OrchestratorRequestError && err.status === 400) {
+      return NextResponse.json(
+        { error: "Rapporten kunde inte behandlas. Försök igen." },
+        { status: 400 },
+      );
+    }
     return NextResponse.json(
-      { error: "Kunde inte spara rapporten. Försök igen." },
-      { status: 500 },
+      { error: "Kunde inte behandla rapporten just nu. Försök igen." },
+      { status: 502 },
     );
   }
 
-  // TODO(Track 2): Ersätt den direkta Supabase-skrivningen ovan med ett
-  // HTTP-anrop till orchestratorns extract_field_report-verktyg när den
-  // tjänsten finns på plats (se BUILD-CONTRACT.md "Orchestratorns verktyg").
-  // Orchestratorn ska då själv skriva till field_reports (extracted +
-  // status) och skapa ett invoice_draft. Just nu sparas raw_text som den
-  // är, med status "pending", som en stub tills dess.
-
   return NextResponse.json({
     ok: true,
-    report_id: report.id,
+    report_id: result.field_report_id,
     staff_name: staff.name,
   });
 }
