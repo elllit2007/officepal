@@ -1,0 +1,9 @@
+{
+  "_comment": "Track 6 (email/follow-ups) cron config. IMPORTANT: Vercel Hobby plan only supports daily-minimum cron intervals (no hourly/sub-daily schedules) and does not guarantee exact-minute execution. Schedule below is once daily at 08:00 UTC as the practical default for this pilot. If the pilot later needs faster follow-up turnaround, this requires upgrading to a Vercel Pro plan (or higher) to unlock more frequent cron schedules.",
+  "crons": [
+    {
+      "path": "/api/cron/follow-ups",
+      "schedule": "0 8 * * *"
+    }
+  ]
+}
