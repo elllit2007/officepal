@@ -13,6 +13,12 @@ function getBaseUrl(): string {
   return url.replace(/\/+$/, "");
 }
 
+// Orkestratorn kan vara nåbar men hänga (t.ex. under kallstart eller om
+// Claude Agent SDK-anropet inuti den tar för lång tid) — utan en timeout
+// skulle fältrapport-requesten hänga på obestämd tid och användaren skulle
+// aldrig få ett felmeddelande (se BUILD-CONTRACT.md, felresiliens).
+const REQUEST_TIMEOUT_MS = 20_000;
+
 async function post<TResponse>(path: string, body: unknown): Promise<TResponse> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   // Optional per orchestrator/README.md: required only when the orchestrator
@@ -26,6 +32,7 @@ async function post<TResponse>(path: string, body: unknown): Promise<TResponse> 
     method: "POST",
     headers,
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
 
   const text = await res.text();

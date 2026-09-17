@@ -34,6 +34,9 @@ export async function createTenant(
       success: null,
     };
   }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) {
+    return { error: "Ange en giltig e-postadress.", success: null };
+  }
   if (adminPassword.length < 8) {
     return { error: "Lösenordet måste vara minst 8 tecken.", success: null };
   }

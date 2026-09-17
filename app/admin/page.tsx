@@ -80,7 +80,7 @@ export default function AdminDashboardPage() {
     async (
       target: { kind: PendingKind; id: string; tenant_id: string },
       action: "approve" | "reject" | "edit",
-      patch?: { customer_name: string; amount: number },
+      patch?: { customer_name: string; amount: number } | { customer_name: string; content: string },
     ) => {
       setBusyId(target.id);
       setActionError(null);
@@ -206,6 +206,9 @@ export default function AdminDashboardPage() {
                 }
                 onReject={(quote) =>
                   runAction({ kind: "quote", id: quote.id, tenant_id: quote.tenant_id }, "reject")
+                }
+                onEdit={(quote, patch) =>
+                  runAction({ kind: "quote", id: quote.id, tenant_id: quote.tenant_id }, "edit", patch)
                 }
               />
             </section>
