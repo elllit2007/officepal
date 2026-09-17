@@ -15,6 +15,10 @@ interface SpeechRecognitionEventLike extends Event {
   results: ArrayLike<SpeechRecognitionResultLike>;
 }
 
+interface SpeechRecognitionErrorEventLike extends Event {
+  error: string;
+}
+
 interface SpeechRecognitionLike extends EventTarget {
   lang: string;
   continuous: boolean;
@@ -22,8 +26,23 @@ interface SpeechRecognitionLike extends EventTarget {
   start: () => void;
   stop: () => void;
   onresult: ((event: SpeechRecognitionEventLike) => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
   onend: (() => void) | null;
+}
+
+// Web Speech API-felkoder (MDN: SpeechRecognitionErrorEvent.error) översatta
+// till korta, begripliga svenska meddelanden istället för att bara tysta ner
+// "lyssnar"-läget utan förklaring.
+const ERROR_MESSAGES: Record<string, string> = {
+  "not-allowed": "Mikrofonen är blockerad. Tillåt mikrofonåtkomst i webbläsaren och försök igen.",
+  "service-not-allowed": "Mikrofonen är blockerad. Tillåt mikrofonåtkomst i webbläsaren och försök igen.",
+  "no-speech": "Hörde inget. Försök prata igen.",
+  "audio-capture": "Ingen mikrofon hittades.",
+  network: "Nätverksfel vid taligenkänning. Försök igen.",
+};
+
+function describeSpeechError(code: string): string {
+  return ERROR_MESSAGES[code] ?? "Något gick fel med rösten. Försök igen eller skriv istället.";
 }
 
 type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
@@ -65,6 +84,7 @@ export function useSpeechRecognition(onFinalTranscript: (text: string) => void) 
     getServerSupportedSnapshot,
   );
   const [listening, setListening] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const onFinalTranscriptRef = useRef(onFinalTranscript);
 
@@ -80,6 +100,7 @@ export function useSpeechRecognition(onFinalTranscript: (text: string) => void) 
     const Ctor = getSpeechRecognitionConstructor();
     if (!Ctor) return;
 
+    setError(null);
     const recognition = new Ctor();
     recognition.lang = "sv-SE";
     recognition.continuous = true;
@@ -98,7 +119,13 @@ export function useSpeechRecognition(onFinalTranscript: (text: string) => void) 
       }
     };
 
-    recognition.onerror = () => setListening(false);
+    recognition.onerror = (event) => {
+      // "aborted" utlöses av vår egen stop()-knapp — inte ett fel att visa.
+      if (event.error !== "aborted") {
+        setError(describeSpeechError(event.error));
+      }
+      setListening(false);
+    };
     recognition.onend = () => setListening(false);
 
     recognitionRef.current = recognition;
@@ -108,5 +135,5 @@ export function useSpeechRecognition(onFinalTranscript: (text: string) => void) 
 
   useEffect(() => stop, [stop]);
 
-  return { supported, listening, start, stop };
+  return { supported, listening, start, stop, error };
 }

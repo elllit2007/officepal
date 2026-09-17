@@ -15,11 +15,17 @@ export default function FaltrapportForm() {
     null,
   );
 
-  const { supported: speechSupported, listening, start, stop } = useSpeechRecognition(
-    (transcript) => {
-      setJobText((prev) => (prev ? `${prev} ${transcript}` : transcript));
-    },
-  );
+  const {
+    supported: speechSupported,
+    listening,
+    start,
+    stop,
+    error: speechError,
+  } = useSpeechRecognition((transcript) => {
+    setJobText((prev) => (prev ? `${prev} ${transcript}` : transcript));
+  });
+
+  const displayedError = error ?? speechError;
 
   const handleMicClick = () => {
     if (listening) {
@@ -161,12 +167,12 @@ export default function FaltrapportForm() {
           )}
         </div>
 
-        {error && (
+        {displayedError && (
           <p
             role="alert"
             className="rounded-xl bg-red-50 px-4 py-3 text-lg text-red-700"
           >
-            {error}
+            {displayedError}
           </p>
         )}
 
