@@ -41,7 +41,16 @@ export async function createTenant(
     return { error: "Lösenordet måste vara minst 8 tecken.", success: null };
   }
 
-  const admin = createAdminClient();
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch (err) {
+    console.error(err);
+    return {
+      error: "Servern är inte rätt konfigurerad. Kontakta support.",
+      success: null,
+    };
+  }
 
   const { data: tenant, error: tenantError } = await admin
     .from("tenants")
