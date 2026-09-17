@@ -1,13 +1,25 @@
+import Link from "next/link";
 import OnboardingForm from "./OnboardingForm";
+import { AuthFrame } from "@/components/ui";
 
 export const metadata = {
-  title: "Kom igång — OfficePal",
+  title: "Kom igång",
 };
 
 export default function OnboardingPage() {
   return (
-    <main className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center px-4 py-16">
+    <AuthFrame
+      width="wide"
+      footer={
+        <>
+          Har ni redan ett konto?{" "}
+          <Link href="/auth/login" className="text-link underline-offset-2 hover:underline">
+            Logga in
+          </Link>
+        </>
+      }
+    >
       <OnboardingForm />
-    </main>
+    </AuthFrame>
   );
 }

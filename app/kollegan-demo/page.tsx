@@ -3,6 +3,15 @@
 import { useState } from "react";
 import Kollegan from "@/components/Kollegan";
 import type { KollegState } from "@/components/Kollegan";
+import {
+  Button,
+  Card,
+  Field,
+  PageContainer,
+  PageHeader,
+  SegmentedControl,
+  Textarea,
+} from "@/components/ui";
 
 const STATES: { value: KollegState; label: string }[] = [
   { value: "idle", label: "Idle" },
@@ -11,17 +20,15 @@ const STATES: { value: KollegState; label: string }[] = [
   { value: "done", label: "Done" },
 ];
 
+const SHORT_MESSAGE =
+  "Fakturautkast till Björkvägen 12 (2 450 kr) väntar på godkännande.";
+const LONG_MESSAGE =
+  "Fakturautkast till Björkvägen 12 väntar på godkännande. Beloppet är 2 450 kr och inkluderar fönsterputs, storstädning och en extra timme för balkongen. Ninas team rapporterade att kunden också bad om en offert på återkommande städning varannan vecka.";
+
 export default function KolleganDemoPage() {
   const [state, setState] = useState<KollegState>("idle");
-  const [message, setMessage] = useState(
-    "Fakturautkast till Björkvägen 12 (2 450 kr) väntar på godkännande.",
-  );
+  const [message, setMessage] = useState(SHORT_MESSAGE);
   const [log, setLog] = useState<string[]>([]);
-
-  const SHORT_MESSAGE =
-    "Fakturautkast till Björkvägen 12 (2 450 kr) väntar på godkännande.";
-  const LONG_MESSAGE =
-    "Fakturautkast till Björkvägen 12 väntar på godkännande. Beloppet är 2 450 kr och inkluderar fönsterputs, storstädning och en extra timme för balkongen. Ninas team rapporterade att kunden också bad om en offert på återkommande städning varannan vecka.";
 
   const pushLog = (entry: string) => {
     const time = new Date().toLocaleTimeString("sv-SE");
@@ -29,64 +36,43 @@ export default function KolleganDemoPage() {
   };
 
   return (
-    <main className="min-h-full flex flex-col gap-10 p-10 max-w-3xl mx-auto">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold">Kollegan — demo</h1>
-        <p className="text-sm text-neutral-500">
-          Alla fyra lägen: idle, listening, asking, done. Track 5.
-        </p>
-      </header>
-
-      <section className="flex flex-wrap gap-2">
-        {STATES.map(({ value, label }) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setState(value)}
-            className={`px-4 py-2 rounded-full text-sm font-medium border transition ${
-              state === value
-                ? "bg-[#2563EB] text-white border-[#2563EB]"
-                : "bg-white text-[#1E3A8A] border-[#DBEAFE] hover:border-[#2563EB]"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <label htmlFor="message" className="text-sm font-medium text-neutral-600">
-          Meddelande (visas i pratbubblan under &quot;asking&quot;)
-        </label>
-        <textarea
-          id="message"
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          rows={2}
-          className="border border-[#DBEAFE] rounded-lg p-2 text-sm"
+    <main className="flex-1">
+      <PageContainer className="flex flex-col gap-8">
+        <PageHeader
+          eyebrow="Track 5"
+          title="Kollegan — demo"
+          description="Alla fyra lägen: idle, listening, asking, done."
         />
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setMessage(SHORT_MESSAGE)}
-            className="px-3 py-1 rounded-full text-xs font-medium border border-[#DBEAFE] text-[#1E3A8A] hover:border-[#2563EB]"
-          >
-            Kort meddelande
-          </button>
-          <button
-            type="button"
-            onClick={() => setMessage(LONG_MESSAGE)}
-            className="px-3 py-1 rounded-full text-xs font-medium border border-[#DBEAFE] text-[#1E3A8A] hover:border-[#2563EB]"
-          >
-            Långt meddelande (2-3 meningar)
-          </button>
-        </div>
-      </section>
 
-      <section className="flex flex-col gap-10">
-        <div className="flex items-center gap-4">
-          <span className="w-24 text-sm text-neutral-500 shrink-0">Large (dashboard)</span>
-          <div className="min-h-[260px] flex items-center">
+        <Card className="flex flex-col gap-5">
+          <SegmentedControl
+            label="Läge"
+            tone="brand"
+            value={state}
+            onChange={setState}
+            options={STATES}
+          />
+          <Field label="Meddelande (visas i pratbubblan under asking)" htmlFor="message">
+            <Textarea
+              id="message"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              rows={2}
+            />
+          </Field>
+          <div className="flex gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setMessage(SHORT_MESSAGE)}>
+              Kort meddelande
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setMessage(LONG_MESSAGE)}>
+              Långt meddelande
+            </Button>
+          </div>
+        </Card>
+
+        <div className="grid gap-5 lg:grid-cols-[1fr_1fr]">
+          <Card className="flex min-h-[400px] flex-col items-center justify-start gap-3">
+            <span className="self-start text-caption text-muted">large (dashboard)</span>
             <Kollegan
               state={state}
               size="large"
@@ -95,47 +81,43 @@ export default function KolleganDemoPage() {
               onEdit={() => pushLog("Redigera (large)")}
               onReject={() => pushLog("Avvisat (large)")}
             />
-          </div>
+          </Card>
+          <Card className="flex flex-col gap-20">
+            <div className="flex items-center gap-6">
+              <span className="w-12 text-caption text-muted">small</span>
+              <Kollegan
+                state={state}
+                size="small"
+                message={message}
+                onApprove={() => pushLog("Godkänt (small)")}
+                onEdit={() => pushLog("Redigera (small)")}
+                onReject={() => pushLog("Avvisat (small)")}
+              />
+            </div>
+            <div className="flex items-center gap-6">
+              <span className="w-12 text-caption text-muted">tiny</span>
+              <Kollegan
+                state={state}
+                size="tiny"
+                message={message}
+                onApprove={() => pushLog("Godkänt (tiny)")}
+                onEdit={() => pushLog("Redigera (tiny)")}
+                onReject={() => pushLog("Avvisat (tiny)")}
+              />
+            </div>
+          </Card>
         </div>
 
-        <div className="flex items-center gap-4">
-          <span className="w-24 text-sm text-neutral-500 shrink-0">Small</span>
-          <div className="min-h-[220px] flex items-center">
-            <Kollegan
-              state={state}
-              size="small"
-              message={message}
-              onApprove={() => pushLog("Godkänt (small)")}
-              onEdit={() => pushLog("Redigera (small)")}
-              onReject={() => pushLog("Avvisat (small)")}
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <span className="w-24 text-sm text-neutral-500 shrink-0">Tiny (hörnbadge, ~48px)</span>
-          <div className="min-h-[200px] flex items-center">
-            <Kollegan
-              state={state}
-              size="tiny"
-              message={message}
-              onApprove={() => pushLog("Godkänt (tiny)")}
-              onEdit={() => pushLog("Redigera (tiny)")}
-              onReject={() => pushLog("Avvisat (tiny)")}
-            />
-          </div>
-        </div>
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold text-neutral-600">Callback-logg</h2>
-        <ul className="text-xs text-neutral-500 flex flex-col gap-1">
-          {log.length === 0 && <li>Inga åtgärder ännu.</li>}
-          {log.map((entry) => (
-            <li key={entry}>{entry}</li>
-          ))}
-        </ul>
-      </section>
+        <Card>
+          <h2 className="text-h4">Callback-logg</h2>
+          <ul className="mt-2 flex flex-col gap-1 font-mono text-caption text-muted">
+            {log.length === 0 && <li>Inga åtgärder ännu.</li>}
+            {log.map((entry) => (
+              <li key={entry}>{entry}</li>
+            ))}
+          </ul>
+        </Card>
+      </PageContainer>
     </main>
   );
 }

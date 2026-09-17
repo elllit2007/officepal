@@ -1,8 +1,20 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Kollegan from "@/components/Kollegan";
+import {
+  Alert,
+  Button,
+  Card,
+  Field,
+  IconMic,
+  Input,
+  Logo,
+  Textarea,
+  cn,
+} from "@/components/ui";
 import { useSpeechRecognition } from "./useSpeechRecognition";
 
 export default function FaltrapportForm() {
@@ -77,107 +89,102 @@ export default function FaltrapportForm() {
 
   if (confirmation) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center gap-8 p-6 text-center bg-white">
-        <Kollegan state="done" size="large" />
-        <h1 className="text-3xl font-bold text-[#1E3A8A]">Rapport skickad!</h1>
-        <p className="text-lg text-neutral-600 max-w-sm">
-          {confirmation.staffName ? `Tack, ${confirmation.staffName}. ` : ""}
-          Din fältrapport är sparad och väntar på hantering.
-        </p>
-        <button
-          type="button"
-          onClick={handleNewReport}
-          className="w-full max-w-xs rounded-2xl bg-[#2563EB] px-8 py-5 text-xl font-semibold text-white active:scale-95 transition"
-        >
-          Registrera ny rapport
-        </button>
+      <main className="flex flex-1 flex-col items-center justify-center px-4 py-10">
+        <div className="flex w-full max-w-[var(--layout-narrow-max)] flex-col items-center gap-6 text-center">
+          <Kollegan state="done" size="large" />
+          <div>
+            <h1 className="text-h1">Rapport skickad</h1>
+            <p className="mt-2 text-body-lg text-muted">
+              {confirmation.staffName ? `Tack, ${confirmation.staffName}. ` : "Tack. "}
+              Din fältrapport är sparad och tas om hand.
+            </p>
+          </div>
+          <Button size="lg" fullWidth onClick={handleNewReport}>
+            Registrera ny rapport
+          </Button>
+        </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen flex flex-col gap-6 p-6 bg-white max-w-md mx-auto w-full">
-      <header className="flex flex-col items-center gap-2 pt-4">
-        <Kollegan state={listening ? "listening" : "idle"} size="large" />
-        <h1 className="text-2xl font-bold text-[#1E3A8A] text-center">
-          Fältrapport
-        </h1>
-        <p className="text-base text-neutral-500 text-center">
-          Beskriv jobbet du precis utfört.
-        </p>
-      </header>
+    <main className="flex flex-1 flex-col items-center px-4 py-6 sm:py-10">
+      <div className="flex w-full max-w-[var(--layout-narrow-max)] flex-col gap-6">
+        <header className="flex flex-col items-center gap-3 text-center">
+          <Link href="/" className="rounded-md focus-visible:outline-none focus-visible:shadow-focus">
+            <Logo size={26} />
+          </Link>
+          <Kollegan state={listening ? "listening" : "idle"} size="large" />
+          <div>
+            <h1 className="text-h1">Fältrapport</h1>
+            <p className="mt-1 text-body-lg text-muted">
+              {listening ? "Jag lyssnar. Berätta vad du gjorde." : "Beskriv jobbet du precis utfört."}
+            </p>
+          </div>
+        </header>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-        <div className="flex flex-col gap-2">
-          <label
-            htmlFor="access_code"
-            className="text-lg font-medium text-neutral-700"
-          >
-            Din kod
-          </label>
-          <input
-            id="access_code"
-            name="access_code"
-            type="text"
-            inputMode="numeric"
-            autoComplete="off"
-            value={accessCode}
-            onChange={(e) => setAccessCode(e.target.value)}
-            placeholder="t.ex. 1001"
-            className="rounded-2xl border-2 border-[#DBEAFE] px-5 py-4 text-xl focus:border-[#2563EB] focus:outline-none"
-          />
-        </div>
+        <Card padding="lg">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+            <Field label="Din kod" htmlFor="access_code" size="lg">
+              <Input
+                id="access_code"
+                name="access_code"
+                type="text"
+                size="lg"
+                mono
+                inputMode="text"
+                autoCapitalize="characters"
+                autoComplete="off"
+                value={accessCode}
+                onChange={(e) => setAccessCode(e.target.value.toUpperCase())}
+                placeholder="t.ex. K7M2XQ"
+              />
+            </Field>
 
-        <div className="flex flex-col gap-2">
-          <label
-            htmlFor="job_text"
-            className="text-lg font-medium text-neutral-700"
-          >
-            Vad gjorde du?
-          </label>
-          <textarea
-            id="job_text"
-            name="job_text"
-            value={jobText}
-            onChange={(e) => setJobText(e.target.value)}
-            rows={7}
-            placeholder="T.ex: Städade kontoret på Storgatan 4, tvättade fönster och dammsög två rum..."
-            className="rounded-2xl border-2 border-[#DBEAFE] px-5 py-4 text-xl focus:border-[#2563EB] focus:outline-none resize-none"
-          />
+            <Field label="Vad gjorde du?" htmlFor="job_text" size="lg">
+              <Textarea
+                id="job_text"
+                name="job_text"
+                size="lg"
+                value={jobText}
+                onChange={(e) => setJobText(e.target.value)}
+                rows={6}
+                placeholder="T.ex: Städade kontoret på Storgatan 4, tvättade fönster och dammsög två rum …"
+              />
+            </Field>
 
-          {speechSupported && (
-            <button
-              type="button"
-              onClick={handleMicClick}
-              aria-pressed={listening}
-              className={`flex items-center justify-center gap-2 rounded-2xl px-6 py-4 text-xl font-semibold transition active:scale-95 ${
-                listening
-                  ? "bg-red-500 text-white"
-                  : "bg-[#DBEAFE] text-[#1E3A8A]"
-              }`}
-            >
-              {listening ? "● Lyssnar... tryck för att stoppa" : "🎤 Prata in"}
-            </button>
-          )}
-        </div>
+            {speechSupported && (
+              <Button
+                type="button"
+                size="lg"
+                fullWidth
+                variant={listening ? "primary" : "secondary"}
+                aria-pressed={listening}
+                onClick={handleMicClick}
+                iconLeft={
+                  listening ? (
+                    <span
+                      aria-hidden="true"
+                      className="size-3 animate-pulse rounded-full bg-on-brand"
+                    />
+                  ) : (
+                    <IconMic />
+                  )
+                }
+                className={cn(listening && "bg-danger hover:bg-danger-ink")}
+              >
+                {listening ? "Lyssnar — tryck för att stoppa" : "Prata in"}
+              </Button>
+            )}
 
-        {error && (
-          <p
-            role="alert"
-            className="rounded-xl bg-red-50 px-4 py-3 text-lg text-red-700"
-          >
-            {error}
-          </p>
-        )}
+            {error && <Alert tone="danger">{error}</Alert>}
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded-2xl bg-[#2563EB] px-8 py-5 text-xl font-semibold text-white active:scale-95 transition disabled:opacity-50"
-        >
-          {submitting ? "Skickar..." : "Skicka rapport"}
-        </button>
-      </form>
+            <Button type="submit" size="lg" fullWidth loading={submitting}>
+              {submitting ? "Skickar" : "Skicka rapport"}
+            </Button>
+          </form>
+        </Card>
+      </div>
     </main>
   );
 }

@@ -15,9 +15,10 @@ export interface NavItem {
 }
 
 function isActive(item: NavItem, pathname: string): boolean {
-  const [path] = item.href.split("#");
-  if (!path) return false;
-  return item.match === "prefix" ? pathname.startsWith(path) : pathname === path;
+  // Ankarlänkar (/admin#offerter) markeras aldrig som aktiva — bara den
+  // "riktiga" sidlänken.
+  if (item.href.includes("#")) return false;
+  return item.match === "prefix" ? pathname.startsWith(item.href) : pathname === item.href;
 }
 
 /**

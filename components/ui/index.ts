@@ -28,4 +28,5 @@ export { AppShell, NavLink, PageContainer, PageHeader } from "./Nav";
 export type { NavItem, AppShellProps } from "./Nav";
 export { StatTile, StatRow } from "./StatTile";
 export { EmptyState } from "./EmptyState";
+export { AuthFrame } from "./AuthFrame";
 export * from "./icons";

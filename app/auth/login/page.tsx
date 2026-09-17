@@ -1,7 +1,9 @@
+import Link from "next/link";
 import LoginForm from "./LoginForm";
+import { AuthFrame, Card } from "@/components/ui";
 
 export const metadata = {
-  title: "Logga in — OfficePal",
+  title: "Logga in",
 };
 
 export default async function LoginPage({
@@ -12,15 +14,25 @@ export default async function LoginPage({
   const { next } = await searchParams;
 
   return (
-    <main className="mx-auto flex min-h-full w-full max-w-sm flex-col justify-center gap-6 px-4 py-16">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold">Logga in</h1>
-        <p className="text-sm text-black/60">
-          Logga in med det admin-konto som skapades vid onboarding.
-        </p>
-      </div>
-
-      <LoginForm next={next && next.startsWith("/") ? next : "/"} />
-    </main>
+    <AuthFrame
+      footer={
+        <>
+          Ny hos OfficePal?{" "}
+          <Link href="/onboarding" className="text-link underline-offset-2 hover:underline">
+            Skapa konto
+          </Link>
+        </>
+      }
+    >
+      <Card padding="lg" className="flex flex-col gap-6">
+        <div>
+          <h1 className="text-h2">Logga in</h1>
+          <p className="mt-1 text-body-sm text-muted">
+            Med det admin-konto som skapades när ni kom igång.
+          </p>
+        </div>
+        <LoginForm next={next && next.startsWith("/") ? next : "/"} />
+      </Card>
+    </AuthFrame>
   );
 }

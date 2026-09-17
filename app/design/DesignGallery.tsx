@@ -40,6 +40,22 @@ const KOLLEG_STATES: { value: KollegState; label: string }[] = [
   { value: "done", label: "Done" },
 ];
 
+// Statiska klassnamn så att Tailwind hittar dem (dynamiska `text-${name}` gör det inte).
+const TYPE_CLASS: Record<keyof typeof typeScale, string> = {
+  display: "text-display",
+  h1: "text-h1",
+  h2: "text-h2",
+  h3: "text-h3",
+  h4: "text-h4",
+  "body-lg": "text-body-lg",
+  body: "text-body",
+  "body-sm": "text-body-sm",
+  label: "text-label",
+  button: "text-button",
+  caption: "text-caption",
+  eyebrow: "text-eyebrow uppercase",
+};
+
 const STATUSES = [
   "awaiting_approval",
   "approved",
@@ -155,14 +171,14 @@ export default function DesignGallery() {
         description="DM Sans för allt, DM Mono för koder. Skalan är rollbaserad: text-h1, text-body, text-label …"
       >
         <Card className="flex flex-col gap-4">
-          {Object.entries(typeScale).map(([name, step]) => (
+          {(Object.keys(typeScale) as (keyof typeof typeScale)[]).map((name) => (
             <div key={name} className="flex flex-wrap items-baseline gap-4 border-b border-line pb-4 last:border-0 last:pb-0">
               <span className="w-24 shrink-0 font-mono text-caption text-muted">text-{name}</span>
-              <span className={`text-${name} ${name === "eyebrow" ? "uppercase" : ""}`}>
+              <span className={TYPE_CLASS[name]}>
                 Nina godkänner fakturan på 2 450 kr
               </span>
               <span className="ml-auto font-mono text-caption text-neutral-500">
-                {step.size} / {step.lineHeight} · {step.weight}
+                {typeScale[name].size} / {typeScale[name].lineHeight} · {typeScale[name].weight}
               </span>
             </div>
           ))}

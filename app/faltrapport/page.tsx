@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import FaltrapportForm from "./FaltrapportForm";
 
 export const metadata = {
-  title: "Fältrapport — OfficePal",
+  title: "Fältrapport",
 };
 
 export default function FaltrapportPage() {

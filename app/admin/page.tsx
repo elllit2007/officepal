@@ -1,9 +1,26 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import Kollegan from "@/components/Kollegan";
 import type { KollegState } from "@/components/Kollegan";
 import type { InvoiceDraft, Quote } from "@/lib/types";
+import {
+  Alert,
+  AppShell,
+  Badge,
+  Card,
+  IconFileText,
+  IconHome,
+  IconMic,
+  IconReceipt,
+  IconSpark,
+  PageContainer,
+  PageHeader,
+  SectionHeading,
+  StatRow,
+  StatTile,
+} from "@/components/ui";
+import LogoutButton from "@/app/auth/components/LogoutButton";
 import { useDashboardData } from "./lib/useDashboardData";
 import { formatSEK } from "./lib/format";
 import InvoiceDraftList from "./components/InvoiceDraftList";
@@ -11,6 +28,14 @@ import QuoteList from "./components/QuoteList";
 import FieldReportList from "./components/FieldReportList";
 
 const DONE_ANIMATION_MS = 1800;
+
+const NAV_ITEMS = [
+  { href: "/admin", label: "Översikt", icon: <IconHome /> },
+  { href: "/admin#fakturautkast", label: "Fakturautkast", icon: <IconReceipt /> },
+  { href: "/admin#offerter", label: "Offerter", icon: <IconFileText /> },
+  { href: "/admin#faltrapporter", label: "Fältrapporter", icon: <IconMic /> },
+  { href: "/design", label: "Designsystem", icon: <IconSpark /> },
+];
 
 type PendingKind = "invoice_draft" | "quote";
 
@@ -58,12 +83,45 @@ function buildAskingMessage(pending: PendingItem[]): string | undefined {
   return `${pending.length} ärenden väntar på godkännande. Först ut: ${describePendingItem(first)}.`;
 }
 
+/**
+ * "Torsdag 17 september" + hälsning efter tid på dygnet. Servern renderar
+ * ett neutralt läge (null) och klienten fyller i — så bråkar server och
+ * klient inte om tidszon, utan att sätta state i en effekt.
+ */
+type Today = { date: string; greeting: string };
+let todayCache: (Today & { key: string }) | null = null;
+
+function getTodaySnapshot(): Today {
+  const now = new Date();
+  const hour = now.getHours();
+  const bucket = hour < 10 ? "morning" : hour < 17 ? "afternoon" : "evening";
+  const key = `${now.toDateString()}:${bucket}`;
+  if (!todayCache || todayCache.key !== key) {
+    const raw = new Intl.DateTimeFormat("sv-SE", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    }).format(now);
+    const greeting =
+      bucket === "morning" ? "God morgon." : bucket === "afternoon" ? "God eftermiddag." : "God kväll.";
+    todayCache = { key, date: raw.charAt(0).toUpperCase() + raw.slice(1), greeting };
+  }
+  return todayCache;
+}
+
+const noopSubscribe = () => () => {};
+
+function useTodayGreeting(): Today | null {
+  return useSyncExternalStore(noopSubscribe, getTodaySnapshot, () => null);
+}
+
 export default function AdminDashboardPage() {
   const { invoiceDrafts, quotes, fieldReports, loading, error, refresh } = useDashboardData();
   const [transientDone, setTransientDone] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const today = useTodayGreeting();
 
   const pendingItems = useMemo(
     () => toPendingItems(invoiceDrafts, quotes),
@@ -133,92 +191,134 @@ export default function AdminDashboardPage() {
     setTimeout(() => setHighlightedId(null), 2000);
   }, [pendingItems]);
 
+  const pendingCount = pendingItems.length;
+  const statusLine = loading
+    ? "Hämtar det senaste …"
+    : pendingCount === 0
+      ? "Lugnt just nu. Inget väntar på dig."
+      : pendingCount === 1
+        ? "Ett ärende väntar på dig."
+        : `${pendingCount} ärenden väntar på dig.`;
+
   return (
-    <main className="min-h-full bg-[#F5F8FF]">
-      <div className="mx-auto flex max-w-4xl flex-col gap-10 px-6 py-10">
-        <header className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold text-[#1E3A8A]">Adminpanel</h1>
-          <p className="text-sm text-neutral-500">
-            Översikt över det som väntar på ditt godkännande.
-          </p>
-        </header>
-
-        <section className="flex flex-col items-center gap-4 rounded-2xl border border-blue-100 bg-white py-10">
-          <Kollegan
-            state={kollegState}
-            size="large"
-            message={buildAskingMessage(pendingItems)}
-            onApprove={handleBubbleApprove}
-            onEdit={handleBubbleEdit}
-            onReject={handleBubbleReject}
+    <AppShell items={NAV_ITEMS} footer={<LogoutButton />}>
+      <main className="flex-1">
+        <PageContainer className="flex flex-col gap-8">
+          <PageHeader
+            eyebrow={<span className="inline-block min-h-5">{today?.date ?? " "}</span>}
+            title={today?.greeting ?? "Hej."}
+            description={statusLine}
           />
-        </section>
 
-        {error && (
-          <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </p>
-        )}
-        {actionError && (
-          <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {actionError}
-          </p>
-        )}
+          {/* Kollegan — mitt i vyn, med pratbubblan när något väntar. */}
+          <Card padding="lg" className="flex flex-col items-center gap-2">
+            <Kollegan
+              state={kollegState}
+              size="large"
+              message={buildAskingMessage(pendingItems)}
+              onApprove={handleBubbleApprove}
+              onEdit={handleBubbleEdit}
+              onReject={handleBubbleReject}
+            />
+            {kollegState === "idle" && !loading && (
+              <p className="text-body-sm text-muted">Jag säger till när något behöver dig.</p>
+            )}
+          </Card>
 
-        {loading ? (
-          <p className="text-sm text-neutral-500">Laddar…</p>
-        ) : (
-          <div className="flex flex-col gap-8">
-            <section className="flex flex-col gap-3">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1E3A8A]">
-                Fakturautkast som väntar
-              </h2>
-              <InvoiceDraftList
-                invoiceDrafts={invoiceDrafts}
-                highlightedId={highlightedId}
-                busyId={busyId}
-                onApprove={(draft) =>
-                  runAction({ kind: "invoice_draft", id: draft.id, tenant_id: draft.tenant_id }, "approve")
-                }
-                onReject={(draft) =>
-                  runAction({ kind: "invoice_draft", id: draft.id, tenant_id: draft.tenant_id }, "reject")
-                }
-                onEdit={(draft, patch) =>
-                  runAction(
-                    { kind: "invoice_draft", id: draft.id, tenant_id: draft.tenant_id },
-                    "edit",
-                    patch,
-                  )
-                }
+          <Card>
+            <StatRow>
+              <StatTile
+                value={invoiceDrafts.length}
+                label="Fakturautkast som väntar"
+                tone={invoiceDrafts.length > 0 ? "warning" : "default"}
               />
-            </section>
-
-            <section className="flex flex-col gap-3">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1E3A8A]">
-                Offerter som väntar på godkännande
-              </h2>
-              <QuoteList
-                quotes={quotes}
-                highlightedId={highlightedId}
-                busyId={busyId}
-                onApprove={(quote) =>
-                  runAction({ kind: "quote", id: quote.id, tenant_id: quote.tenant_id }, "approve")
-                }
-                onReject={(quote) =>
-                  runAction({ kind: "quote", id: quote.id, tenant_id: quote.tenant_id }, "reject")
-                }
+              <StatTile
+                value={quotes.length}
+                label="Offerter som väntar"
+                tone={quotes.length > 0 ? "warning" : "default"}
               />
-            </section>
+              <StatTile value={fieldReports.length} label="Senaste fältrapporter" />
+            </StatRow>
+          </Card>
 
-            <section className="flex flex-col gap-3">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1E3A8A]">
-                Senaste fältrapporter
-              </h2>
-              <FieldReportList fieldReports={fieldReports} />
-            </section>
-          </div>
-        )}
-      </div>
-    </main>
+          {error && <Alert tone="danger" title="Kunde inte hämta data">{error}</Alert>}
+          {actionError && <Alert tone="danger">{actionError}</Alert>}
+
+          {loading ? (
+            <p className="text-body-sm text-muted">Laddar …</p>
+          ) : (
+            <div className="flex flex-col gap-10">
+              <section className="flex flex-col gap-4">
+                <SectionHeading
+                  id="fakturautkast"
+                  title="Fakturautkast som väntar"
+                  description="Godkänn, justera kund och belopp, eller avvisa."
+                  action={
+                    invoiceDrafts.length > 0 && (
+                      <Badge tone="warning" dot>
+                        {invoiceDrafts.length} väntar
+                      </Badge>
+                    )
+                  }
+                />
+                <InvoiceDraftList
+                  invoiceDrafts={invoiceDrafts}
+                  highlightedId={highlightedId}
+                  busyId={busyId}
+                  onApprove={(draft) =>
+                    runAction({ kind: "invoice_draft", id: draft.id, tenant_id: draft.tenant_id }, "approve")
+                  }
+                  onReject={(draft) =>
+                    runAction({ kind: "invoice_draft", id: draft.id, tenant_id: draft.tenant_id }, "reject")
+                  }
+                  onEdit={(draft, patch) =>
+                    runAction(
+                      { kind: "invoice_draft", id: draft.id, tenant_id: draft.tenant_id },
+                      "edit",
+                      patch,
+                    )
+                  }
+                />
+              </section>
+
+              <section className="flex flex-col gap-4">
+                <SectionHeading
+                  id="offerter"
+                  title="Offerter som väntar"
+                  description="Inget skickas till kund förrän du sagt ja."
+                  action={
+                    quotes.length > 0 && (
+                      <Badge tone="warning" dot>
+                        {quotes.length} väntar
+                      </Badge>
+                    )
+                  }
+                />
+                <QuoteList
+                  quotes={quotes}
+                  highlightedId={highlightedId}
+                  busyId={busyId}
+                  onApprove={(quote) =>
+                    runAction({ kind: "quote", id: quote.id, tenant_id: quote.tenant_id }, "approve")
+                  }
+                  onReject={(quote) =>
+                    runAction({ kind: "quote", id: quote.id, tenant_id: quote.tenant_id }, "reject")
+                  }
+                />
+              </section>
+
+              <section className="flex flex-col gap-4">
+                <SectionHeading
+                  id="faltrapporter"
+                  title="Senaste fältrapporter"
+                  description="Det personalen rapporterat in, nyast först."
+                />
+                <FieldReportList fieldReports={fieldReports} />
+              </section>
+            </div>
+          )}
+        </PageContainer>
+      </main>
+    </AppShell>
   );
 }
