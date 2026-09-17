@@ -1,5 +1,5 @@
 import type { HookCallback, PostToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { logDecision, logAwaitingOutcome } from "../lib/approvals.js";
+import { logDecision } from "../lib/approvals.js";
 import { logger } from "../lib/logger.js";
 import { WRITING_TOOL_NAMES } from "../tools/index.js";
 
@@ -66,22 +66,17 @@ export const logToolOutcomeHook: HookCallback = async (input) => {
     return {};
   }
 
-  if (payload.decision === "approved") {
-    await logDecision({
-      tenantId: payload.tenant_id,
-      targetType: payload.target_type,
-      targetId: payload.target_id,
-      action: "approved",
-      decidedBy: null, // autonomous — no human decided
-    });
-  } else {
-    logAwaitingOutcome({
-      tenantId: payload.tenant_id,
-      targetType: payload.target_type,
-      targetId: payload.target_id,
-      taskType: event.tool_name,
-    });
-  }
+  // decision is "approved" (autonomous execution) or "awaiting" (deferred to
+  // a human) — both are valid approvals.action values now. decided_by is
+  // null either way: no human has decided yet in either case, the human
+  // decision (POST /approve) logs its own separate row later.
+  await logDecision({
+    tenantId: payload.tenant_id,
+    targetType: payload.target_type,
+    targetId: payload.target_id,
+    action: payload.decision,
+    decidedBy: null,
+  });
 
   return {};
 };

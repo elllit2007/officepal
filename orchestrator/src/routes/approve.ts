@@ -17,12 +17,13 @@ const bodySchema = z.object({
  * POST /approve — the human half of the trust gate. A writing tool
  * (create_invoice_draft/create_quote_draft) leaves a row awaiting a human
  * decision when trust_settings requires one; this is where that decision is
- * recorded. Always logs to approvals (insert-only audit trail), and, for
- * invoice_drafts, transitions the row's own status too.
+ * recorded. Always logs to approvals (insert-only audit trail), and
+ * transitions the target row's own status too.
  *
- * NOTE — contract gap (see src/lib/approvals.ts): quotes has no
- * approved/rejected status value, so a quote's decision lives only in
- * approvals, not on quotes.status.
+ * quotes has no "approved" status distinct from "draft" (an approved quote
+ * is simply cleared to send — Track 6 sets status: 'sent' later), but it
+ * does have "rejected", so a rejection transitions quotes.status; an
+ * approval does not.
  */
 export async function approve(req: Request, res: Response) {
   const parsed = bodySchema.safeParse(req.body);
@@ -56,14 +57,28 @@ export async function approve(req: Request, res: Response) {
   } else {
     const { data: quote, error: fetchError } = await supabase
       .from("quotes")
-      .select("id, tenant_id")
+      .select("id, tenant_id, status")
       .eq("id", target_id)
       .maybeSingle();
 
     if (fetchError) return res.status(500).json({ error: "lookup_failed", message: fetchError.message });
     if (!quote) return res.status(404).json({ error: "quote_not_found" });
     if (quote.tenant_id !== tenant_id) return res.status(403).json({ error: "tenant_mismatch" });
-    // No status transition — see contract-gap note above.
+    if (quote.status !== "draft") {
+      return res.status(409).json({ error: "not_awaiting_approval", status: quote.status });
+    }
+
+    if (action === "rejected") {
+      const { error: updateError } = await supabase
+        .from("quotes")
+        .update({ status: "rejected" })
+        .eq("id", target_id);
+
+      if (updateError) {
+        return res.status(500).json({ error: "update_failed", message: updateError.message });
+      }
+    }
+    // action === "approved": stays "draft" — cleared to send, no distinct status.
   }
 
   await logDecision({

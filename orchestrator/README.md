@@ -27,27 +27,22 @@ implement agent logic itself.
 - `src/routes/approve.ts` — `POST /approve`, the human half of the trust
   gate (used by the admin dashboard, Track 4).
 
-## Known contract gaps (flagged, not silently worked around)
+## Contract gaps (resolved by Track 1)
 
-BUILD-CONTRACT.md and `supabase/schema.sql` disagree in two places. Rather
-than modify Track 1's schema (out of scope for this track), the orchestrator
-works within the actual DB constraints and documents the gap:
+`approvals.action` now allows `'awaiting' | 'approved' | 'rejected'` and
+`quotes.status` now allows `'rejected'` (both added to
+`supabase/schema.sql` after this service was first built — `src/types.ts`,
+`src/lib/approvals.ts`, `src/hooks/logToolOutcome.ts` and
+`src/routes/approve.ts` were updated to match). One asymmetry remains by
+design, not by gap: `quotes` still has no `'approved'` status distinct from
+`'draft'` — an approved quote is simply cleared to send (Track 6 sets
+`status: 'sent'` later), so `POST /approve` only transitions `quotes.status`
+on rejection.
 
-1. **`approvals.action` only allows `'approved' | 'rejected'`** (DB check
-   constraint), but BUILD-CONTRACT.md's wording ("logga *every* tool call
-   outcome") could be read as wanting an "awaiting" entry too. There is no
-   valid `action` value for that. An "awaiting" outcome is represented by the
-   target row's own status (`invoice_drafts.status = 'awaiting_approval'`)
-   and a structured log line, not an `approvals` row. See
-   `src/lib/approvals.ts`.
-2. **`quotes` has no `approved`/`rejected` status value** (its statuses are
-   `draft | sent | followed_up | accepted | expired`). A quote's trust
-   decision therefore lives only in `approvals`, never as a `quotes.status`
-   transition. See `src/routes/approve.ts`.
-
-If Track 1 wants to close these gaps (e.g. add an `awaiting` action value,
-or a `quotes` status for rejection), this file's `src/types.ts` and the two
-files above are where to update the orchestrator side.
+A writing tool that defers to a human now logs an `'awaiting'` row to
+`approvals` at write time (`decided_by: null`); `POST /approve` later logs a
+second row with the human's `'approved'`/`'rejected'` decision — a full
+two-row trail per gated write.
 
 ## `lib/types.ts` reconciliation note
 
@@ -62,6 +57,13 @@ match by hand.
 on purpose — see the comment at the top of that file. An `interface` there
 silently breaks `supabase-js`'s generic type inference and every
 `supabase.from(...)` call resolves to `never`.)
+
+**As of the last sync, `../lib/types.ts` does not compile** — `Omit<` and
+`Partial<` lost their `<` on four lines (`FieldReportInsert`,
+`InvoiceDraftInsert`, `QuoteInsert`), e.g. `export type FieldReportInsert =
+Omit\n  FieldReport,` with no opening bracket. This is Track 1's file, out
+of scope for this track to fix; `src/types.ts` here is unaffected since it's
+a hand-copied mirror, not an import.
 
 ## Local development
 

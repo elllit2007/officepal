@@ -33,9 +33,10 @@ export type QuoteStatus =
   | "sent"
   | "followed_up"
   | "accepted"
-  | "expired";
+  | "expired"
+  | "rejected";
 
-export type ApprovalAction = "approved" | "rejected";
+export type ApprovalAction = "awaiting" | "approved" | "rejected";
 
 export type Tenant = {
   id: string;

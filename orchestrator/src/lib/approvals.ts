@@ -7,7 +7,7 @@ export interface LogDecisionInput {
   targetType: "invoice_draft" | "quote";
   targetId: string;
   action: ApprovalAction;
-  /** auth.users id of the human who decided, or null for an autonomous decision. */
+  /** auth.users id of the human who decided, or null for a system-recorded entry (autonomous execution, or a write left awaiting approval). */
   decidedBy: string | null;
 }
 
@@ -17,15 +17,11 @@ export interface LogDecisionInput {
  * detta är audit-trailen"). Never update/delete; supabase/schema.sql has no
  * UPDATE/DELETE policy on this table, so it would fail anyway.
  *
- * NOTE — contract gap: approvals.action has a DB check constraint allowing
- * only 'approved' | 'rejected' (supabase/schema.sql). It cannot represent an
- * "awaiting" outcome. When a writing tool defers to a human instead of
- * executing, we do NOT insert a row here (there is no valid action value for
- * it) — the pending state lives on the target row itself
- * (invoice_drafts.status = 'awaiting_approval', quotes.status = 'draft') and
- * is only logged to stdout. Flagged for Track 1/Elliot: either add an
- * 'awaiting' action value, or accept that "awaiting" is represented by the
- * target row's status rather than by an approvals row.
+ * approvals.action allows 'awaiting' | 'approved' | 'rejected' (see
+ * supabase/schema.sql check constraint), so a writing tool that defers to a
+ * human logs an 'awaiting' row here (decided_by: null) at write time, and
+ * POST /approve later logs a second row with the human's 'approved' /
+ * 'rejected' decision — a full two-row trail per gated write.
  */
 export async function logDecision(input: LogDecisionInput): Promise<void> {
   const { error } = await supabase.from("approvals").insert({
@@ -48,13 +44,4 @@ export async function logDecision(input: LogDecisionInput): Promise<void> {
       error: error.message,
     });
   }
-}
-
-export function logAwaitingOutcome(fields: {
-  tenantId: string;
-  targetType: "invoice_draft" | "quote";
-  targetId: string;
-  taskType: string;
-}): void {
-  logger.info("writing tool outcome: awaiting_approval (not logged to approvals — see contract gap note)", fields);
 }
