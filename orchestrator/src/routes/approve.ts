@@ -1,0 +1,80 @@
+import type { Request, Response } from "express";
+import { z } from "zod";
+import { supabase } from "../lib/supabase.js";
+import { logDecision } from "../lib/approvals.js";
+import { logger } from "../lib/logger.js";
+
+const bodySchema = z.object({
+  tenant_id: z.string().uuid(),
+  target_type: z.enum(["invoice_draft", "quote"]),
+  target_id: z.string().uuid(),
+  action: z.enum(["approved", "rejected"]),
+  // auth.users id of the admin deciding (Track 7 owns admin auth).
+  decided_by: z.string().uuid().nullable().optional(),
+});
+
+/**
+ * POST /approve — the human half of the trust gate. A writing tool
+ * (create_invoice_draft/create_quote_draft) leaves a row awaiting a human
+ * decision when trust_settings requires one; this is where that decision is
+ * recorded. Always logs to approvals (insert-only audit trail), and, for
+ * invoice_drafts, transitions the row's own status too.
+ *
+ * NOTE — contract gap (see src/lib/approvals.ts): quotes has no
+ * approved/rejected status value, so a quote's decision lives only in
+ * approvals, not on quotes.status.
+ */
+export async function approve(req: Request, res: Response) {
+  const parsed = bodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "invalid_body", details: parsed.error.flatten() });
+  }
+  const { tenant_id, target_type, target_id, action, decided_by } = parsed.data;
+
+  if (target_type === "invoice_draft") {
+    const { data: draft, error: fetchError } = await supabase
+      .from("invoice_drafts")
+      .select("id, tenant_id, status")
+      .eq("id", target_id)
+      .maybeSingle();
+
+    if (fetchError) return res.status(500).json({ error: "lookup_failed", message: fetchError.message });
+    if (!draft) return res.status(404).json({ error: "invoice_draft_not_found" });
+    if (draft.tenant_id !== tenant_id) return res.status(403).json({ error: "tenant_mismatch" });
+    if (draft.status !== "awaiting_approval") {
+      return res.status(409).json({ error: "not_awaiting_approval", status: draft.status });
+    }
+
+    const { error: updateError } = await supabase
+      .from("invoice_drafts")
+      .update({ status: action })
+      .eq("id", target_id);
+
+    if (updateError) {
+      return res.status(500).json({ error: "update_failed", message: updateError.message });
+    }
+  } else {
+    const { data: quote, error: fetchError } = await supabase
+      .from("quotes")
+      .select("id, tenant_id")
+      .eq("id", target_id)
+      .maybeSingle();
+
+    if (fetchError) return res.status(500).json({ error: "lookup_failed", message: fetchError.message });
+    if (!quote) return res.status(404).json({ error: "quote_not_found" });
+    if (quote.tenant_id !== tenant_id) return res.status(403).json({ error: "tenant_mismatch" });
+    // No status transition — see contract-gap note above.
+  }
+
+  await logDecision({
+    tenantId: tenant_id,
+    targetType: target_type,
+    targetId: target_id,
+    action,
+    decidedBy: decided_by ?? null,
+  });
+
+  logger.info("approve: decision recorded", { tenant_id, target_type, target_id, action });
+
+  return res.status(200).json({ ok: true, target_type, target_id, action });
+}
