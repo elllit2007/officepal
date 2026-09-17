@@ -109,53 +109,8 @@ invoice draft or a quote draft (or both), gated by `trust_settings`.
 
 ## Deploying to Fly.io
 
-Requires the [`flyctl`](https://fly.io/docs/flyctl/install/) CLI and a Fly
-account. Run these from `orchestrator/` (this directory) — `fly.toml` and
-the `Dockerfile` are already here.
-
-1. **Log in** (once per machine):
-   ```bash
-   fly auth login
-   ```
-
-2. **Launch the app** (first time only — creates the Fly app, does *not*
-   deploy secrets or overwrite the provided `fly.toml`/`Dockerfile`):
-   ```bash
-   fly launch --no-deploy --copy-config
-   ```
-   When prompted:
-   - Use the existing `fly.toml` (don't let it regenerate one).
-   - Pick an app name (or accept the generated one) — update `app =` in
-     `fly.toml` to match if you change it.
-   - Choose a region close to Sweden (`fly.toml` defaults to `arn`,
-     Stockholm).
-   - Say **no** to adding a Postgres/Redis database — Supabase is the DB.
-
-3. **Set secrets** (never commit these — they go directly to Fly, not into
-   `fly.toml`):
-   ```bash
-   fly secrets set \
-     SUPABASE_URL="https://xxxxxxxxxxxx.supabase.co" \
-     SUPABASE_SERVICE_ROLE_KEY="..." \
-     ANTHROPIC_API_KEY="sk-ant-..." \
-     ORCHESTRATOR_SHARED_SECRET="$(openssl rand -hex 32)"
-   ```
-   Save the generated `ORCHESTRATOR_SHARED_SECRET` value — Track 3/4's
-   Next.js API routes need the same value to call this service.
-
-4. **Deploy**:
-   ```bash
-   fly deploy
-   ```
-
-5. **Verify**:
-   ```bash
-   curl https://<your-app-name>.fly.dev/health
-   # {"ok":true}
-   ```
-
-6. **Redeploying** after changes: just `fly deploy` again from this
-   directory. `fly secrets set` is only needed when a secret value changes.
-
-`fly.toml` sets `min_machines_running = 0` (scales to zero when idle, fine
-for a pilot with one tenant) and a `/health` check.
+See [`DEPLOY.md`](./DEPLOY.md) for the exact, numbered commands (`fly
+launch`, `fly secrets set`, `fly deploy`, verifying `/health`). `fly.toml`
+sets `min_machines_running = 0` (scales to zero when idle, fine for a pilot
+with one tenant) and a `/health` check backed by the route in
+`src/index.ts`.
