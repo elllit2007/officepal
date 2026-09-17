@@ -109,6 +109,15 @@ keep the `chown -R node:node /app` + `USER node` steps, and `chown` any new
 files/directories you `COPY` in after them so the app can still read them
 at runtime.
 
+`fly.toml`'s `[http_service]` sets `min_machines_running = 1`, so the
+machine never fully autostops during the pilot — a cold start (machine
+boot + health check) adds ~20s on top of the agent's normal ~5-6s
+processing time, which field staff would otherwise hit on every request
+after a few idle minutes. This keeps one machine warm at all times (small
+added Fly cost) in exchange for consistent latency. If cost becomes a
+concern after the pilot and occasional cold starts become acceptable,
+this can go back to `0`.
+
 ## Redeploying later
 
 ```bash

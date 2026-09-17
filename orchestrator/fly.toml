@@ -16,7 +16,10 @@ primary_region = "arn" # Stockholm — closest Fly region to Nina's pilot; chang
   force_https = true
   auto_stop_machines = "stop"
   auto_start_machines = true
-  min_machines_running = 0
+  # Keep one machine warm for the pilot — autostopping to 0 adds a ~20s cold
+  # start (machine boot + health check) on top of the agent's normal ~5-6s
+  # processing time. See DEPLOY.md.
+  min_machines_running = 1
   processes = ["app"]
 
 [[http_service.checks]]
