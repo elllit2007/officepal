@@ -1,29 +1,29 @@
--- OfficePal MVP — Nina-piloten
--- Track 1 (Schema & kontrakt) — se BUILD-CONTRACT.md "Databaskontrakt"
+﻿-- OfficePal MVP -- Nina-piloten
+-- Track 1 (Schema & kontrakt) -- se BUILD-CONTRACT.md "Databaskontrakt"
 --
--- Kör detta mot en FÄRSK Supabase-databas. Se SETUP.md för instruktioner.
+-- Kor detta mot en FARSK Supabase-databas. Se SETUP.md for instruktioner.
 --
--- Multi-tenancy: varje tabell (utom tenants självt) har en tenant_id-kolumn,
--- ett index på den, och Row Level Security scopead mot den.
+-- Multi-tenancy: varje tabell (utom tenants sjalvt) har en tenant_id-kolumn,
+-- ett index pa den, och Row Level Security scopead mot den.
 --
--- RLS-strategi (se SETUP.md för fullständig förklaring):
---   - Adminanvändare loggar in via Supabase Auth. Deras tenant_id läggs i
---     app_metadata på auth-användaren (Track 7 äger onboarding/inloggning).
---     app.current_tenant_id() läser ut den claimen ur JWT:t.
---   - Fältpersonal autentiseras INTE via Supabase Auth (ingen lösenordsauth,
---     se staff.access_code). Deras requests går via en Next.js API-route som
+-- RLS-strategi (se SETUP.md for fullstandig forklaring):
+--   - Adminanvandare loggar in via Supabase Auth. Deras tenant_id laggs i
+--     app_metadata pa auth-anvandaren (Track 7 ager onboarding/inloggning).
+--     app.current_tenant_id() laser ut den claimen ur JWT:t.
+--   - Faltpersonal autentiseras INTE via Supabase Auth (ingen losenordsauth,
+--     se staff.access_code). Deras requests gar via en Next.js API-route som
 --     validerar access_code server-side och sedan skriver med service-role-
---     nyckeln, vilket kringgår RLS helt (standard Supabase-mönster för
---     betrodd server-kod). RLS här skyddar alltså primärt direkt klientåtkomst
---     (t.ex. admin-dashboarden) mot att läsa/skriva utanför sin egen tenant.
---   - Orchestratorn (Track 2) använder också service-role-nyckeln.
+--     nyckeln, vilket kringgar RLS helt (standard Supabase-monster for
+--     betrodd server-kod). RLS har skyddar alltsa primart direkt klientatkomst
+--     (t.ex. admin-dashboarden) mot att lasa/skriva utanfor sin egen tenant.
+--   - Orchestratorn (Track 2) anvander ocksa service-role-nyckeln.
 
 create extension if not exists pgcrypto with schema extensions;
 
 -- ---------------------------------------------------------------------------
--- Helper: läs ut tenant_id från den inloggade adminanvändarens JWT.
+-- Helper: las ut tenant_id fran den inloggade adminanvandarens JWT.
 -- Returnerar null om ingen matchande claim finns (t.ex. service-role-anrop,
--- vilka ändå kringgår RLS och aldrig konsulterar denna funktion).
+-- vilka andå kringgar RLS och aldrig konsulterar denna funktion).
 -- ---------------------------------------------------------------------------
 create schema if not exists app;
 
@@ -53,14 +53,14 @@ create table if not exists public.tenants (
 
 alter table public.tenants enable row level security;
 
--- Nya tenants skapas server-side (service role, t.ex. onboarding-flödet i
--- Track 7) — därför finns ingen publik insert-policy här.
+-- Nya tenants skapas server-side (service role, t.ex. onboarding-flodet i
+-- Track 7) -- darfor finns ingen publik insert-policy har.
 create policy "tenants_select_own" on public.tenants
   for select
   using (id = app.current_tenant_id());
 
 -- ---------------------------------------------------------------------------
--- staff (fältpersonal, ingen lösenordsauth — access_code används istället)
+-- staff (faltpersonal, ingen losenordsauth -- access_code anvands istallet)
 -- ---------------------------------------------------------------------------
 create table if not exists public.staff (
   id          uuid primary key default gen_random_uuid(),
@@ -137,6 +137,7 @@ create table if not exists public.invoice_drafts (
   tenant_id        uuid not null references public.tenants(id) on delete cascade,
   field_report_id  uuid references public.field_reports(id) on delete set null,
   customer_name    text not null,
+  customer_email   text,
   amount           numeric(12, 2) not null,
   line_items       jsonb not null default '[]'::jsonb,
   status           text not null default 'awaiting_approval'
@@ -174,9 +175,10 @@ create table if not exists public.quotes (
   id            uuid primary key default gen_random_uuid(),
   tenant_id     uuid not null references public.tenants(id) on delete cascade,
   customer_name text not null,
+  customer_email text,
   content       text not null,
   status        text not null default 'draft'
-                check (status in ('draft', 'sent', 'followed_up', 'accepted', 'expired')),
+                check (status in ('draft', 'sent', 'followed_up', 'accepted', 'expired', 'rejected')),
   sent_at       timestamptz,
   follow_up_at  timestamptz,
   created_at    timestamptz not null default now()
@@ -205,14 +207,14 @@ create policy "quotes_delete_own_tenant" on public.quotes
   using (tenant_id = app.current_tenant_id());
 
 -- ---------------------------------------------------------------------------
--- approvals — insert-only audit-trail. ALDRIG update/delete-policies.
+-- approvals -- insert-only audit-trail. ALDRIG update/delete-policies.
 -- ---------------------------------------------------------------------------
 create table if not exists public.approvals (
   id          uuid primary key default gen_random_uuid(),
   tenant_id   uuid not null references public.tenants(id) on delete cascade,
   target_type text not null,
   target_id   uuid not null,
-  action      text not null check (action in ('approved', 'rejected')),
+  action      text not null check (action in ('awaiting', 'approved', 'rejected')),
   decided_by  uuid references auth.users(id) on delete set null,
   decided_at  timestamptz not null default now()
 );
@@ -222,9 +224,9 @@ create index if not exists approvals_target_idx on public.approvals (target_type
 
 alter table public.approvals enable row level security;
 
--- Endast SELECT och INSERT — ingen UPDATE/DELETE-policy skapas någonsin.
--- Med RLS påslaget och utan matchande policy nekas UPDATE/DELETE som default,
--- oavsett roll (förutom service_role/superuser som kringgår RLS).
+-- Endast SELECT och INSERT -- ingen UPDATE/DELETE-policy skapas nagonsin.
+-- Med RLS paslaget och utan matchande policy nekas UPDATE/DELETE som default,
+-- oavsett roll (forutom service_role/superuser som kringgar RLS).
 create policy "approvals_select_own_tenant" on public.approvals
   for select
   using (tenant_id = app.current_tenant_id());
@@ -234,7 +236,7 @@ create policy "approvals_insert_own_tenant" on public.approvals
   with check (tenant_id = app.current_tenant_id());
 
 -- ---------------------------------------------------------------------------
--- trust_settings — förtroendereglage per tenant och uppgiftstyp
+-- trust_settings -- fortroendereglage per tenant och uppgiftstyp
 -- ---------------------------------------------------------------------------
 create table if not exists public.trust_settings (
   tenant_id  uuid not null references public.tenants(id) on delete cascade,
