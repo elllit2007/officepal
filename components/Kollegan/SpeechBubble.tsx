@@ -1,6 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { motion as motionTokens } from "@/design/tokens";
+import { Button } from "@/components/ui/Button";
 import styles from "./Kollegan.module.css";
 import type { KollegSize } from "./types";
 
@@ -12,6 +14,11 @@ interface SpeechBubbleProps {
   onReject?: () => void;
 }
 
+/**
+ * Pratbubblan i "asking"-läget. Beskriver ÅTGÄRDEN som väntar och ger tre
+ * tydliga val. Under den stora figuren ligger bubblan nedanför (fungerar
+ * på mobil); vid small/tiny ligger den till höger.
+ */
 export default function SpeechBubble({
   message,
   size,
@@ -19,48 +26,35 @@ export default function SpeechBubble({
   onEdit,
   onReject,
 }: SpeechBubbleProps) {
+  const below = size === "large";
+  const buttonSize = size === "large" ? "md" : "sm";
+
   return (
     <motion.div
-      className={`${styles.speechBubble} ${
-        size === "tiny"
-          ? styles.speechBubbleTiny
-          : size === "small"
-            ? styles.speechBubbleSmall
-            : ""
+      className={`${styles.bubble} ${below ? styles.bubbleBelow : styles.bubbleSide} ${
+        size === "tiny" ? styles.bubbleTiny : ""
       }`}
-      initial={{ opacity: 0, scale: 0.85, x: -8 }}
-      animate={{ opacity: 1, scale: 1, x: 0 }}
-      exit={{ opacity: 0, scale: 0.85, x: -8 }}
-      transition={{ type: "spring", stiffness: 380, damping: 26 }}
+      initial={{ opacity: 0, scale: 0.92, y: below ? -6 : 0, x: below ? 0 : -6 }}
+      animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
+      exit={{ opacity: 0, scale: 0.92, y: below ? -6 : 0, x: below ? 0 : -6 }}
+      transition={motionTokens.easing.spring}
       role="alertdialog"
       aria-label="Väntar på godkännande"
     >
-      <span className={styles.speechBubbleTail} aria-hidden="true" />
-      <p className={styles.speechBubbleMessage}>
+      <span className={styles.bubbleTail} aria-hidden="true" />
+      <p className={styles.bubbleMessage}>
         {message ?? "Något väntar på ditt godkännande."}
       </p>
-      <div className={styles.speechBubbleActions}>
-        <button
-          type="button"
-          className={`${styles.bubbleButton} ${styles.bubbleButtonApprove}`}
-          onClick={onApprove}
-        >
+      <div className={styles.bubbleActions}>
+        <Button size={buttonSize} variant="primary" onClick={onApprove}>
           Godkänn
-        </button>
-        <button
-          type="button"
-          className={`${styles.bubbleButton} ${styles.bubbleButtonEdit}`}
-          onClick={onEdit}
-        >
+        </Button>
+        <Button size={buttonSize} variant="secondary" onClick={onEdit}>
           Redigera
-        </button>
-        <button
-          type="button"
-          className={`${styles.bubbleButton} ${styles.bubbleButtonReject}`}
-          onClick={onReject}
-        >
+        </Button>
+        <Button size={buttonSize} variant="destructive" onClick={onReject}>
           Avvisa
-        </button>
+        </Button>
       </div>
     </motion.div>
   );

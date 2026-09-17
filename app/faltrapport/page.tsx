@@ -3,7 +3,7 @@ import Kollegan from "@/components/Kollegan";
 import FaltrapportForm from "./FaltrapportForm";
 
 export const metadata = {
-  title: "Fältrapport — OfficePal",
+  title: "Fältrapport",
 };
 
 // Samma rubrik-del som formuläret, så att sidan inte blinkar till tom

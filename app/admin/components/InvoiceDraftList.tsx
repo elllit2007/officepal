@@ -2,8 +2,15 @@
 
 import { useState } from "react";
 import type { InvoiceDraft } from "@/lib/types";
-import StatusBadge from "./StatusBadge";
-import EmptyState from "./EmptyState";
+import {
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  IconReceipt,
+  Input,
+  StatusBadge,
+} from "@/components/ui";
 import { formatSEK, formatDateTime } from "../lib/format";
 
 interface InvoiceDraftListProps {
@@ -43,8 +50,9 @@ export default function InvoiceDraftList({
   if (invoiceDrafts.length === 0) {
     return (
       <EmptyState
-        title="Inga fakturautkast väntar just nu."
-        hint="När en fältrapport har bearbetats dyker fakturautkastet upp här för ditt godkännande."
+        icon={<IconReceipt />}
+        title="Inga fakturautkast väntar"
+        description="När personalen rapporterar ett jobb dyker utkastet upp här för ditt godkännande."
       />
     );
   }
@@ -57,89 +65,80 @@ export default function InvoiceDraftList({
         const isHighlighted = highlightedId === draft.id;
 
         return (
-          <li
+          <Card
+            as="li"
             key={draft.id}
             id={`invoice-draft-${draft.id}`}
-            className={`rounded-xl border p-4 transition-shadow ${
-              isHighlighted
-                ? "border-[#2563EB] ring-2 ring-[#2563EB]/30"
-                : "border-blue-100"
-            } bg-white`}
+            padding="sm"
+            highlighted={isHighlighted}
+            className="scroll-mt-24 sm:p-5"
           >
             {isEditing ? (
-              <div className="flex flex-col gap-2">
-                <label className="flex flex-col gap-1 text-xs font-medium text-neutral-600">
-                  Kund
-                  <input
-                    value={draftName}
-                    onChange={(e) => setDraftName(e.target.value)}
-                    className="rounded-lg border border-blue-200 px-2 py-1 text-sm"
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-xs font-medium text-neutral-600">
-                  Belopp (kr)
-                  <input
-                    type="number"
-                    value={draftAmount}
-                    onChange={(e) => setDraftAmount(e.target.value)}
-                    className="rounded-lg border border-blue-200 px-2 py-1 text-sm"
-                  />
-                </label>
-                <div className="flex gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => saveEdit(draft)}
-                    className="rounded-full bg-[#2563EB] px-3 py-1 text-xs font-medium text-white hover:bg-[#1E3A8A]"
-                  >
+              <div className="flex flex-col gap-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Kund" htmlFor={`edit-name-${draft.id}`}>
+                    <Input
+                      id={`edit-name-${draft.id}`}
+                      value={draftName}
+                      onChange={(e) => setDraftName(e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Belopp (kr)" htmlFor={`edit-amount-${draft.id}`}>
+                    <Input
+                      id={`edit-amount-${draft.id}`}
+                      type="number"
+                      inputMode="decimal"
+                      value={draftAmount}
+                      onChange={(e) => setDraftAmount(e.target.value)}
+                    />
+                  </Field>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => saveEdit(draft)}>
                     Spara
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditingId(null)}
-                    className="rounded-full border border-blue-200 px-3 py-1 text-xs font-medium text-[#1E3A8A]"
-                  >
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => setEditingId(null)}>
                     Avbryt
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : (
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="font-medium text-[#1E3A8A]">{draft.customer_name}</p>
-                  <p className="text-sm text-neutral-500">
-                    {formatSEK(draft.amount)} · {formatDateTime(draft.created_at)}
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-h4 truncate">{draft.customer_name}</p>
+                  <p className="text-body-sm text-muted">
+                    <span className="font-medium text-ink tabular-nums">
+                      {formatSEK(draft.amount)}
+                    </span>
+                    {" · "}
+                    {formatDateTime(draft.created_at)}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge status={draft.status} />
-                  <button
-                    type="button"
-                    disabled={isBusy}
-                    onClick={() => onApprove(draft)}
-                    className="rounded-full bg-[#2563EB] px-3 py-1 text-xs font-medium text-white hover:bg-[#1E3A8A] disabled:opacity-50"
-                  >
+                  <Button size="sm" disabled={isBusy} onClick={() => onApprove(draft)}>
                     Godkänn
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
                     disabled={isBusy}
                     onClick={() => startEdit(draft)}
-                    className="rounded-full border border-blue-200 px-3 py-1 text-xs font-medium text-[#1E3A8A] disabled:opacity-50"
                   >
                     Redigera
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
                     disabled={isBusy}
                     onClick={() => onReject(draft)}
-                    className="rounded-full border border-red-200 px-3 py-1 text-xs font-medium text-red-700 disabled:opacity-50"
                   >
                     Avvisa
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
-          </li>
+          </Card>
         );
       })}
     </ul>

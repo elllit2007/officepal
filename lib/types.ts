@@ -36,6 +36,8 @@ export type Staff = {
   tenant_id: string;
   name: string;
   access_code: string;
+  /** Track 12: false = inaktiverad (behåller historik, kan inte rapportera). */
+  active: boolean;
   created_at: string;
 };
 
@@ -99,8 +101,8 @@ export type TrustSetting = {
 export type TenantInsert = Omit<Tenant, "id" | "created_at"> &
   Partial<Pick<Tenant, "id" | "created_at">>;
 
-export type StaffInsert = Omit<Staff, "id" | "created_at"> &
-  Partial<Pick<Staff, "id" | "created_at">>;
+export type StaffInsert = Omit<Staff, "id" | "created_at" | "active"> &
+  Partial<Pick<Staff, "id" | "created_at" | "active">>;
 
 export type FieldReportInsert = Omit<
   FieldReport,

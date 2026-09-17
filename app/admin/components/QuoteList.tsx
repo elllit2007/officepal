@@ -2,8 +2,16 @@
 
 import { useState } from "react";
 import type { Quote } from "@/lib/types";
-import StatusBadge from "./StatusBadge";
-import EmptyState from "./EmptyState";
+import {
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  IconFileText,
+  StatusBadge,
+  Textarea,
+  Input,
+} from "@/components/ui";
 import { formatDateTime } from "../lib/format";
 
 interface QuoteListProps {
@@ -42,8 +50,9 @@ export default function QuoteList({
   if (quotes.length === 0) {
     return (
       <EmptyState
-        title="Inga offerter väntar just nu."
-        hint="Offertutkast som behöver ditt godkännande innan de skickas visas här."
+        icon={<IconFileText />}
+        title="Inga offerter väntar"
+        description="Offertutkast som behöver ditt godkännande innan de skickas hamnar här."
       />
     );
   }
@@ -56,85 +65,71 @@ export default function QuoteList({
         const isHighlighted = highlightedId === quote.id;
 
         return (
-          <li
+          <Card
+            as="li"
             key={quote.id}
             id={`quote-${quote.id}`}
-            className={`rounded-xl border p-4 transition-shadow ${
-              isHighlighted ? "border-[#2563EB] ring-2 ring-[#2563EB]/30" : "border-blue-100"
-            } bg-white`}
+            padding="sm"
+            highlighted={isHighlighted}
+            className="scroll-mt-24 sm:p-5"
           >
             {isEditing ? (
-              <div className="flex flex-col gap-2">
-                <label className="flex flex-col gap-1 text-xs font-medium text-neutral-600">
-                  Kund
-                  <input
+              <div className="flex flex-col gap-4">
+                <Field label="Kund" htmlFor={`edit-quote-name-${quote.id}`}>
+                  <Input
+                    id={`edit-quote-name-${quote.id}`}
                     value={draftName}
                     onChange={(e) => setDraftName(e.target.value)}
-                    className="rounded-lg border border-blue-200 px-2 py-1 text-sm"
                   />
-                </label>
-                <label className="flex flex-col gap-1 text-xs font-medium text-neutral-600">
-                  Offertinnehåll
-                  <textarea
+                </Field>
+                <Field label="Offertinnehåll" htmlFor={`edit-quote-content-${quote.id}`}>
+                  <Textarea
+                    id={`edit-quote-content-${quote.id}`}
                     value={draftContent}
                     onChange={(e) => setDraftContent(e.target.value)}
                     rows={4}
-                    className="rounded-lg border border-blue-200 px-2 py-1 text-sm"
                   />
-                </label>
-                <div className="flex gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => saveEdit(quote)}
-                    className="rounded-full bg-[#2563EB] px-3 py-1 text-xs font-medium text-white hover:bg-[#1E3A8A]"
-                  >
+                </Field>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => saveEdit(quote)}>
                     Spara
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditingId(null)}
-                    className="rounded-full border border-blue-200 px-3 py-1 text-xs font-medium text-[#1E3A8A]"
-                  >
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => setEditingId(null)}>
                     Avbryt
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : (
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="font-medium text-[#1E3A8A]">{quote.customer_name}</p>
-                  <p className="text-sm text-neutral-500">{formatDateTime(quote.created_at)}</p>
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-h4 truncate">{quote.customer_name}</p>
+                  <p className="text-body-sm text-muted">{formatDateTime(quote.created_at)}</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge status={quote.status} />
-                  <button
-                    type="button"
-                    disabled={isBusy}
-                    onClick={() => onApprove(quote)}
-                    className="rounded-full bg-[#2563EB] px-3 py-1 text-xs font-medium text-white hover:bg-[#1E3A8A] disabled:opacity-50"
-                  >
+                  <Button size="sm" disabled={isBusy} onClick={() => onApprove(quote)}>
                     Godkänn
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
                     disabled={isBusy}
                     onClick={() => startEdit(quote)}
-                    className="rounded-full border border-blue-200 px-3 py-1 text-xs font-medium text-[#1E3A8A] disabled:opacity-50"
                   >
                     Redigera
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
                     disabled={isBusy}
                     onClick={() => onReject(quote)}
-                    className="rounded-full border border-red-200 px-3 py-1 text-xs font-medium text-red-700 disabled:opacity-50"
                   >
                     Avvisa
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
-          </li>
+          </Card>
         );
       })}
     </ul>
