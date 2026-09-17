@@ -1,10 +1,16 @@
 import type { FieldReport } from "@/lib/types";
 import StatusBadge from "./StatusBadge";
+import EmptyState from "./EmptyState";
 import { formatDateTime } from "../lib/format";
 
 export default function FieldReportList({ fieldReports }: { fieldReports: FieldReport[] }) {
   if (fieldReports.length === 0) {
-    return <p className="text-sm text-neutral-500">Inga fältrapporter ännu.</p>;
+    return (
+      <EmptyState
+        title="Inga fältrapporter ännu."
+        hint="Rapporter som personalen skickar in via fältrapport-sidan visas här."
+      />
+    );
   }
 
   return (

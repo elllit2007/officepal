@@ -103,5 +103,12 @@ export function useDashboardData() {
     setReloadToken((token) => token + 1);
   }, []);
 
-  return { ...data, loading: loadedToken !== reloadToken, error, refresh };
+  // `loading` = första hämtningen (inget att visa ännu → skelett).
+  // `refreshing` = en ny hämtning pågår efter refresh(), men befintlig data
+  // finns kvar och ska fortsätta visas — annars blinkar listorna till tomt
+  // efter varje godkännande.
+  const loading = loadedToken === -1;
+  const refreshing = !loading && loadedToken !== reloadToken;
+
+  return { ...data, loading, refreshing, error, refresh };
 }
