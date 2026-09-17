@@ -13,6 +13,6 @@ export const config = {
   anthropicApiKey: required("ANTHROPIC_API_KEY"),
   // Optional on purpose: fail open with a startup warning rather than crash,
   // so local dev without the secret still boots. checked per-request in
-  // src/middleware/auth.ts.
+  // src/lib/auth.ts.
   sharedSecret: process.env.ORCHESTRATOR_SHARED_SECRET ?? null,
 };

@@ -2,6 +2,7 @@ import express from "express";
 import { config } from "./config.js";
 import { logger } from "./lib/logger.js";
 import { requireSharedSecret } from "./lib/auth.js";
+import { asyncHandler } from "./lib/asyncHandler.js";
 import { processReport } from "./routes/processReport.js";
 import { approve } from "./routes/approve.js";
 
@@ -12,8 +13,8 @@ app.get("/health", (_req, res) => {
   res.status(200).json({ ok: true });
 });
 
-app.post("/process-report", requireSharedSecret, processReport);
-app.post("/approve", requireSharedSecret, approve);
+app.post("/process-report", requireSharedSecret, asyncHandler(processReport));
+app.post("/approve", requireSharedSecret, asyncHandler(approve));
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error("unhandled error", { error: err instanceof Error ? err.message : String(err) });
