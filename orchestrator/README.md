@@ -58,12 +58,10 @@ on purpose — see the comment at the top of that file. An `interface` there
 silently breaks `supabase-js`'s generic type inference and every
 `supabase.from(...)` call resolves to `never`.)
 
-**As of the last sync, `../lib/types.ts` does not compile** — `Omit<` and
-`Partial<` lost their `<` on four lines (`FieldReportInsert`,
-`InvoiceDraftInsert`, `QuoteInsert`), e.g. `export type FieldReportInsert =
-Omit\n  FieldReport,` with no opening bracket. This is Track 1's file, out
-of scope for this track to fix; `src/types.ts` here is unaffected since it's
-a hand-copied mirror, not an import.
+`../lib/types.ts` briefly didn't compile (`Omit<`/`Partial<` missing their
+`<`) — fixed upstream on `main` (Track 1) and pulled into this branch.
+`src/types.ts` here was unaffected either way since it's a hand-copied
+mirror, not an import.
 
 ## Local development
 
