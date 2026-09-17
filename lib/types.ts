@@ -114,23 +114,23 @@ export type TenantInsert = Omit<Tenant, "id" | "created_at"> &
 export type StaffInsert = Omit<Staff, "id" | "created_at"> &
   Partial<Pick<Staff, "id" | "created_at">>;
 
-export type FieldReportInsert = Omit
+export type FieldReportInsert = Omit<
   FieldReport,
   "id" | "created_at" | "status" | "extracted"
 > &
   Partial<Pick<FieldReport, "id" | "created_at" | "status" | "extracted">>;
 
-export type InvoiceDraftInsert = Omit
+export type InvoiceDraftInsert = Omit<
   InvoiceDraft,
   "id" | "created_at" | "status" | "line_items"
 > &
   Partial<Pick<InvoiceDraft, "id" | "created_at" | "status" | "line_items">>;
 
-export type QuoteInsert = Omit
+export type QuoteInsert = Omit<
   Quote,
   "id" | "created_at" | "status" | "sent_at" | "follow_up_at"
 > &
-  Partial
+  Partial<
     Pick<Quote, "id" | "created_at" | "status" | "sent_at" | "follow_up_at">
   >;
 
