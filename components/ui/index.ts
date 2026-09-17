@@ -29,4 +29,5 @@ export type { NavItem, AppShellProps } from "./Nav";
 export { StatTile, StatRow } from "./StatTile";
 export { EmptyState } from "./EmptyState";
 export { AuthFrame } from "./AuthFrame";
+export { LoadingPresence } from "./LoadingPresence";
 export * from "./icons";

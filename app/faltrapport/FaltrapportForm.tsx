@@ -114,11 +114,17 @@ export default function FaltrapportForm() {
           <Link href="/" className="rounded-md focus-visible:outline-none focus-visible:shadow-focus">
             <Logo size={26} />
           </Link>
+          {/* Figuren lyssnar medan man pratar in; medan rapporten skickas
+              står hon lugnt kvar (idle) — knappen visar att det jobbar. */}
           <Kollegan state={listening ? "listening" : "idle"} size="large" />
           <div>
             <h1 className="text-h1">Fältrapport</h1>
             <p className="mt-1 text-body-lg text-muted">
-              {listening ? "Jag lyssnar. Berätta vad du gjorde." : "Beskriv jobbet du precis utfört."}
+              {submitting
+                ? "Skickar din rapport …"
+                : listening
+                  ? "Jag lyssnar. Berätta vad du gjorde."
+                  : "Beskriv jobbet du precis utfört."}
             </p>
           </div>
         </header>

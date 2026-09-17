@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import Kollegan from "@/components/Kollegan";
 import type { KollegState } from "@/components/Kollegan";
 import type { InvoiceDraft, Quote } from "@/lib/types";
@@ -9,11 +10,7 @@ import {
   AppShell,
   Badge,
   Card,
-  IconFileText,
-  IconHome,
-  IconMic,
-  IconReceipt,
-  IconSpark,
+  LoadingPresence,
   PageContainer,
   PageHeader,
   SectionHeading,
@@ -21,6 +18,7 @@ import {
   StatTile,
 } from "@/components/ui";
 import LogoutButton from "@/app/auth/components/LogoutButton";
+import { ADMIN_NAV } from "./nav";
 import { useDashboardData } from "./lib/useDashboardData";
 import { formatSEK } from "./lib/format";
 import InvoiceDraftList from "./components/InvoiceDraftList";
@@ -29,13 +27,8 @@ import FieldReportList from "./components/FieldReportList";
 
 const DONE_ANIMATION_MS = 1800;
 
-const NAV_ITEMS = [
-  { href: "/admin", label: "Översikt", icon: <IconHome /> },
-  { href: "/admin#fakturautkast", label: "Fakturautkast", icon: <IconReceipt /> },
-  { href: "/admin#offerter", label: "Offerter", icon: <IconFileText /> },
-  { href: "/admin#faltrapporter", label: "Fältrapporter", icon: <IconMic /> },
-  { href: "/design", label: "Designsystem", icon: <IconSpark /> },
-];
+/** Så länge "Nytt ärende"-pulsen syns när något nytt dyker upp. */
+const FRESH_PULSE_MS = 2600;
 
 type PendingKind = "invoice_draft" | "quote";
 
@@ -128,11 +121,36 @@ export default function AdminDashboardPage() {
     [invoiceDrafts, quotes],
   );
 
+  // Ambient närvaro: Kollegan lyssnar medan data hämtas, frågar när något
+  // väntar, bekräftar kort efter ett beslut, annars lugn.
   const kollegState: KollegState = transientDone
     ? "done"
-    : pendingItems.length > 0
-      ? "asking"
-      : "idle";
+    : loading
+      ? "listening"
+      : pendingItems.length > 0
+        ? "asking"
+        : "idle";
+
+  // "Nytt ärende"-puls när ett ärende dyker upp som inte fanns i förra
+  // hämtningen (inte vid första laddningen — då är allt nytt).
+  const pendingKey = pendingItems.map((item) => item.id).join(",");
+  const [seenKey, setSeenKey] = useState<string | null>(null);
+  const [fresh, setFresh] = useState(false);
+  if (!loading && seenKey !== pendingKey) {
+    const seenIds = seenKey === null ? null : new Set(seenKey.split(",").filter(Boolean));
+    const hasNew = seenIds !== null && pendingItems.some((item) => !seenIds.has(item.id));
+    setSeenKey(pendingKey);
+    if (hasNew) setFresh(true);
+  }
+  useEffect(() => {
+    if (!fresh) return;
+    const timer = setTimeout(() => setFresh(false), FRESH_PULSE_MS);
+    return () => clearTimeout(timer);
+  }, [fresh]);
+
+  const hasAnyData =
+    invoiceDrafts.length > 0 || quotes.length > 0 || fieldReports.length > 0;
+  const initialLoading = loading && !hasAnyData;
 
   const runAction = useCallback(
     async (
@@ -201,7 +219,7 @@ export default function AdminDashboardPage() {
         : `${pendingCount} ärenden väntar på dig.`;
 
   return (
-    <AppShell items={NAV_ITEMS} footer={<LogoutButton />}>
+    <AppShell items={ADMIN_NAV} footer={<LogoutButton />}>
       <main className="flex-1">
         <PageContainer className="flex flex-col gap-8">
           <PageHeader
@@ -210,18 +228,47 @@ export default function AdminDashboardPage() {
             description={statusLine}
           />
 
-          {/* Kollegan — mitt i vyn, med pratbubblan när något väntar. */}
-          <Card padding="lg" className="flex flex-col items-center gap-2">
-            <Kollegan
-              state={kollegState}
-              size="large"
-              message={buildAskingMessage(pendingItems)}
-              onApprove={handleBubbleApprove}
-              onEdit={handleBubbleEdit}
-              onReject={handleBubbleReject}
-            />
-            {kollegState === "idle" && !loading && (
+          {/* Kollegan — mitt i vyn, med pratbubblan när något väntar.
+              Fast min-höjd så att listorna under inte hoppar när bubblan
+              kommer eller går. */}
+          <Card padding="lg" className="flex min-h-[22rem] flex-col items-center justify-start gap-2">
+            <motion.div
+              className="flex flex-col items-center"
+              animate={{ scale: fresh ? [1, 1.05, 1] : 1 }}
+              transition={{ duration: 0.6, ease: "easeInOut" }}
+            >
+              <Kollegan
+                state={kollegState}
+                size="large"
+                message={buildAskingMessage(pendingItems)}
+                onApprove={handleBubbleApprove}
+                onEdit={handleBubbleEdit}
+                onReject={handleBubbleReject}
+              />
+            </motion.div>
+            <AnimatePresence>
+              {fresh && (
+                <motion.div
+                  key="fresh"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.2 }}
+                  className="mt-2"
+                >
+                  <Badge tone="warning" dot>
+                    Nytt ärende
+                  </Badge>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {kollegState === "idle" && (
               <p className="text-body-sm text-muted">Jag säger till när något behöver dig.</p>
+            )}
+            {kollegState === "listening" && (
+              <p className="text-body-sm text-muted" role="status" aria-live="polite">
+                Hämtar det senaste …
+              </p>
             )}
           </Card>
 
@@ -244,10 +291,15 @@ export default function AdminDashboardPage() {
           {error && <Alert tone="danger" title="Kunde inte hämta data">{error}</Alert>}
           {actionError && <Alert tone="danger">{actionError}</Alert>}
 
-          {loading ? (
-            <p className="text-body-sm text-muted">Laddar …</p>
+          {initialLoading ? (
+            <LoadingPresence label="Hämtar fakturautkast, offerter och rapporter …" />
           ) : (
-            <div className="flex flex-col gap-10">
+            <div
+              aria-busy={loading || undefined}
+              className={`flex flex-col gap-10 transition-opacity duration-base ${
+                loading ? "opacity-60" : "opacity-100"
+              }`}
+            >
               <section className="flex flex-col gap-4">
                 <SectionHeading
                   id="fakturautkast"

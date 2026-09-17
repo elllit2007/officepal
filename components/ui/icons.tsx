@@ -169,3 +169,39 @@ export const IconMenu = (p: IconProps) => (
     <path d="M4 7h16M4 12h16M4 17h16" />
   </Icon>
 );
+
+export const IconSettings = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx={12} cy={12} r={3} />
+    <path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6 18 18M6 18l1.4-1.4M16.6 7.4 18 6" />
+  </Icon>
+);
+
+export const IconRefresh = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M20 12a8 8 0 1 1-2.3-5.7" />
+    <path d="M20 4v5h-5" />
+  </Icon>
+);
+
+export const IconTrash = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 7h16M10 11v6M14 11v6" />
+    <path d="M6 7l1 13h10l1-13" />
+    <path d="M9 7V4h6v3" />
+  </Icon>
+);
+
+export const IconKey = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx={8} cy={14} r={4} />
+    <path d="M11 11 20 2M16 6l2.5 2.5M13.5 8.5 16 11" />
+  </Icon>
+);
+
+export const IconBuilding = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 21V5l8-2 8 2v16" />
+    <path d="M9 9h2M13 9h2M9 13h2M13 13h2M10 21v-4h4v4" />
+  </Icon>
+);
