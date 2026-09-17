@@ -73,6 +73,7 @@ export type InvoiceDraft = {
   tenant_id: string;
   field_report_id: string | null;
   customer_name: string;
+  customer_email: string | null;
   amount: number;
   line_items: InvoiceLineItem[];
   status: InvoiceDraftStatus;
@@ -83,6 +84,7 @@ export type Quote = {
   id: string;
   tenant_id: string;
   customer_name: string;
+  customer_email: string | null;
   content: string;
   status: QuoteStatus;
   sent_at: string | null;
@@ -121,16 +123,21 @@ export type FieldReportInsert = Omit<
 
 export type InvoiceDraftInsert = Omit<
   InvoiceDraft,
-  "id" | "created_at" | "status" | "line_items"
+  "id" | "created_at" | "status" | "line_items" | "customer_email"
 > &
-  Partial<Pick<InvoiceDraft, "id" | "created_at" | "status" | "line_items">>;
+  Partial<
+    Pick<InvoiceDraft, "id" | "created_at" | "status" | "line_items" | "customer_email">
+  >;
 
 export type QuoteInsert = Omit<
   Quote,
-  "id" | "created_at" | "status" | "sent_at" | "follow_up_at"
+  "id" | "created_at" | "status" | "sent_at" | "follow_up_at" | "customer_email"
 > &
   Partial<
-    Pick<Quote, "id" | "created_at" | "status" | "sent_at" | "follow_up_at">
+    Pick<
+      Quote,
+      "id" | "created_at" | "status" | "sent_at" | "follow_up_at" | "customer_email"
+    >
   >;
 
 export type ApprovalInsert = Omit<Approval, "id" | "decided_at"> &

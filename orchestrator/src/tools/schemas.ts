@@ -11,6 +11,7 @@ export const extractFieldReportInput = {
   raw_text: z.string().min(1),
   structured: z.object({
     customer_name: z.string().min(1),
+    customer_email: z.string().email().nullable().optional(),
     service_type: z.string().min(1),
     location: z.string().optional(),
     work_items: z
@@ -39,6 +40,7 @@ export const createInvoiceDraftInput = {
   tenant_id: z.string().uuid(),
   field_report_id: z.string().uuid().nullable().optional(),
   customer_name: z.string().min(1),
+  customer_email: z.string().email().nullable().optional(),
   line_items: z
     .array(
       z.object({
@@ -52,6 +54,7 @@ export const createInvoiceDraftInput = {
 export const createQuoteDraftInput = {
   tenant_id: z.string().uuid(),
   customer_name: z.string().min(1),
+  customer_email: z.string().email().nullable().optional(),
   content: z.string().min(1),
 };
 

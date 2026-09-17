@@ -27,6 +27,7 @@ export const createQuoteDraftTool = tool(
       .insert({
         tenant_id: args.tenant_id,
         customer_name: args.customer_name,
+        customer_email: args.customer_email ?? null,
         content: args.content,
         // quotes has no "awaiting_approval" status distinct from "draft" —
         // the trust decision is recorded separately via the approvals hook,

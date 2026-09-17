@@ -63,6 +63,7 @@ export const createInvoiceDraftTool = tool(
         tenant_id: args.tenant_id,
         field_report_id: args.field_report_id ?? null,
         customer_name: args.customer_name,
+        customer_email: args.customer_email ?? null,
         amount,
         line_items: pricedItems,
         status,
