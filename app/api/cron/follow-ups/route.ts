@@ -133,26 +133,44 @@ async function processQuote(
     tenantName,
   });
 
+  // Markera som "followed_up" INNAN vi skickar e-post (villkorat på att
+  // status fortfarande är "sent"), inte efter. Annars: om sändningen
+  // lyckas men den efterföljande statusuppdateringen misslyckas, hittar
+  // morgondagens cron-körning samma offert igen (status är kvar "sent")
+  // och skickar en duplicerad påminnelse till kunden. Med denna ordning
+  // kan ett sänt mejl aldrig dubbelskickas — misslyckas sändningen efteråt
+  // återställer vi statusen så att morgondagens körning försöker igen.
+  const { data: claimedRows, error: claimError } = await supabase
+    .from("quotes")
+    .update({ status: "followed_up" })
+    .eq("id", quote.id)
+    .eq("status", "sent")
+    .select("id");
+
+  if (claimError) {
+    return {
+      quoteId: quote.id,
+      status: "failed",
+      reason: `Kunde inte reservera offerten för uppföljning: ${claimError.message}`,
+    };
+  }
+
+  if (!claimedRows || claimedRows.length === 0) {
+    return {
+      quoteId: quote.id,
+      status: "skipped",
+      reason: "Offerten hann bytas till en annan status innan uppföljningen kördes.",
+    };
+  }
+
   const sendResult = await sendEmail({ to: quote.customer_email, content });
 
   if (!sendResult.success) {
+    await supabase.from("quotes").update({ status: "sent" }).eq("id", quote.id);
     return {
       quoteId: quote.id,
       status: "failed",
       reason: sendResult.error,
-    };
-  }
-
-  const { error: updateError } = await supabase
-    .from("quotes")
-    .update({ status: "followed_up" })
-    .eq("id", quote.id);
-
-  if (updateError) {
-    return {
-      quoteId: quote.id,
-      status: "failed",
-      reason: `E-post skickad men status kunde inte uppdateras: ${updateError.message}`,
     };
   }
 

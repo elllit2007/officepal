@@ -96,9 +96,12 @@ export default function AdminDashboardPage() {
             patch,
           }),
         });
+        const resBody = await res.json().catch(() => ({}));
         if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body.error ?? "Något gick fel.");
+          throw new Error(resBody.error ?? "Något gick fel.");
+        }
+        if (resBody.warning) {
+          setActionError(resBody.warning);
         }
 
         refresh();
