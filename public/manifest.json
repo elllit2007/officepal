@@ -1,0 +1,25 @@
+{
+  "name": "OfficePal — Adminpanel",
+  "short_name": "OfficePal",
+  "description": "Godkänn fakturautkast, offerter och fältrapporter för din verksamhet.",
+  "start_url": "/admin",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#2563EB",
+  "lang": "sv",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
