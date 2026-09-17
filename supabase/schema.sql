@@ -59,6 +59,13 @@ create policy "tenants_select_own" on public.tenants
   for select
   using (id = app.current_tenant_id());
 
+-- Track 12: admin far andra sin egen tenant (t.ex. foretagsnamn) via
+-- cookie-klienten. Ingen insert/delete-policy -- det sker fortsatt server-side.
+create policy "tenants_update_own" on public.tenants
+  for update
+  using (id = app.current_tenant_id())
+  with check (id = app.current_tenant_id());
+
 -- ---------------------------------------------------------------------------
 -- staff (faltpersonal, ingen losenordsauth -- access_code anvands istallet)
 -- ---------------------------------------------------------------------------
@@ -67,11 +74,16 @@ create table if not exists public.staff (
   tenant_id   uuid not null references public.tenants(id) on delete cascade,
   name        text not null,
   access_code text not null,
+  -- Track 12: mjuk inaktivering. Inaktiv personal behaller sin historik
+  -- (field_reports.staff_id ar on delete restrict) men ska inte kunna
+  -- rapportera -- /api/faltrapport ska avvisa koder dar active = false.
+  active      boolean not null default true,
   created_at  timestamptz not null default now(),
   unique (tenant_id, access_code)
 );
 
 create index if not exists staff_tenant_id_idx on public.staff (tenant_id);
+create index if not exists staff_tenant_id_active_idx on public.staff (tenant_id, active);
 
 alter table public.staff enable row level security;
 

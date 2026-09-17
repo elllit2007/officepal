@@ -4,17 +4,20 @@ import { useActionState, useState, useTransition } from "react";
 import type { Staff } from "@/lib/types";
 import {
   Alert,
+  Badge,
   Button,
   CodeChip,
   EmptyState,
   Field,
+  IconCircleCheck,
   IconPlus,
   IconRefresh,
-  IconTrash,
   IconUsers,
+  IconX,
   Input,
+  cn,
 } from "@/components/ui";
-import { addStaff, deleteStaff, regenerateStaffCode, type FormState } from "../actions";
+import { addStaff, regenerateStaffCode, setStaffActive, type FormState } from "../actions";
 
 const initialState: FormState = { error: null, success: null };
 
@@ -24,44 +27,40 @@ function formatDate(iso: string) {
 
 function StaffRow({ member }: { member: Staff }) {
   const [pending, startTransition] = useTransition();
-  const [confirming, setConfirming] = useState(false);
   const [message, setMessage] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
+  const active = member.active !== false;
 
   const run = (action: () => Promise<FormState>) => {
     setMessage(null);
     startTransition(async () => {
       const result = await action();
-      setConfirming(false);
       if (result.error) setMessage({ tone: "danger", text: result.error });
       else if (result.success) setMessage({ tone: "success", text: result.success });
     });
   };
 
   return (
-    <li className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0" aria-busy={pending || undefined}>
+    <li
+      className={cn(
+        "flex flex-col gap-3 py-4 first:pt-0 last:pb-0 transition-opacity duration-base",
+        !active && "opacity-70",
+      )}
+      aria-busy={pending || undefined}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
           <p className="text-h4 truncate">{member.name}</p>
-          <CodeChip>{member.access_code}</CodeChip>
+          {active ? (
+            <CodeChip>{member.access_code}</CodeChip>
+          ) : (
+            <Badge tone="neutral" dot>
+              Inaktiv
+            </Badge>
+          )}
           <span className="text-caption text-muted">sedan {formatDate(member.created_at)}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {confirming ? (
-            <>
-              <span className="text-body-sm text-muted">Ta bort {member.name}?</span>
-              <Button
-                size="sm"
-                variant="destructive"
-                loading={pending}
-                onClick={() => run(() => deleteStaff(member.id))}
-              >
-                Ja, ta bort
-              </Button>
-              <Button size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(false)}>
-                Avbryt
-              </Button>
-            </>
-          ) : (
+          {active ? (
             <>
               <Button
                 size="sm"
@@ -75,14 +74,24 @@ function StaffRow({ member }: { member: Staff }) {
               <Button
                 size="sm"
                 variant="ghost"
-                iconLeft={<IconTrash size={16} />}
+                iconLeft={<IconX size={16} />}
                 disabled={pending}
                 className="text-danger-ink hover:bg-danger-soft"
-                onClick={() => setConfirming(true)}
+                onClick={() => run(() => setStaffActive(member.id, false))}
               >
-                Ta bort
+                Inaktivera
               </Button>
             </>
+          ) : (
+            <Button
+              size="sm"
+              variant="secondary"
+              iconLeft={<IconCircleCheck size={16} />}
+              loading={pending}
+              onClick={() => run(() => setStaffActive(member.id, true))}
+            >
+              Aktivera igen
+            </Button>
           )}
         </div>
       </div>
@@ -97,6 +106,8 @@ function StaffRow({ member }: { member: Staff }) {
 
 export default function StaffManager({ staff }: { staff: Staff[] }) {
   const [state, formAction, pending] = useActionState(addStaff, initialState);
+  const activeStaff = staff.filter((m) => m.active !== false);
+  const inactiveStaff = staff.filter((m) => m.active === false);
 
   return (
     <div className="flex flex-col gap-6">
@@ -108,10 +119,23 @@ export default function StaffManager({ staff }: { staff: Staff[] }) {
         />
       ) : (
         <ul className="flex flex-col divide-y divide-line">
-          {staff.map((member) => (
+          {activeStaff.map((member) => (
             <StaffRow key={member.id} member={member} />
           ))}
         </ul>
+      )}
+
+      {inactiveStaff.length > 0 && (
+        <div className="flex flex-col gap-3 border-t border-line pt-5">
+          <p className="text-label text-muted">
+            Inaktiva ({inactiveStaff.length}) — historiken finns kvar, koden fungerar inte.
+          </p>
+          <ul className="flex flex-col divide-y divide-line">
+            {inactiveStaff.map((member) => (
+              <StaffRow key={member.id} member={member} />
+            ))}
+          </ul>
+        </div>
       )}
 
       <form

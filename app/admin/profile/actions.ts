@@ -2,17 +2,14 @@
 
 // Kontosidan (/admin/profile) — server actions.
 //
-// Läsning och det mesta av skrivningen går via cookie-klienten (anon-nyckel +
-// session), så RLS i supabase/schema.sql gäller: staff och trust_settings
-// har full CRUD-policy per tenant. tenants har BARA select-policy, därför
-// uppdateras företagsnamnet via service-role-klienten efter att vi själva
-// verifierat att sessionens tenant_id är den tenant som ändras (samma
-// mönster som onboarding-flödet i Track 7).
+// All läsning och skrivning går via cookie-klienten (anon-nyckel + session),
+// så RLS i supabase/schema.sql gäller: staff och trust_settings har full
+// CRUD-policy per tenant, tenants har select + update (tenants_update_own,
+// Track 12). Ingen service-role här.
 
 import { revalidatePath } from "next/cache";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/app/auth/lib/supabase/server";
-import { createAdminClient } from "@/app/auth/lib/supabase/admin";
 import { generateAccessCode } from "@/app/onboarding/lib/access-code";
 import type { TrustLevel } from "@/lib/types";
 import { TRUST_LEVELS, TRUST_TASK_TYPES } from "./trust";
@@ -54,10 +51,19 @@ export async function updateCompanyName(
   if (name.length > 80) return { error: "Företagsnamnet är för långt (max 80 tecken).", success: null };
 
   try {
-    const { tenantId } = await requireSession();
-    const admin = createAdminClient();
-    const { error } = await admin.from("tenants").update({ name }).eq("id", tenantId);
+    const { supabase, tenantId } = await requireSession();
+    const { data, error } = await supabase
+      .from("tenants")
+      .update({ name })
+      .eq("id", tenantId)
+      .select("id")
+      .maybeSingle();
     if (error) throw new Error("Kunde inte spara företagsnamnet. Försök igen.");
+    if (!data) {
+      throw new Error(
+        "Kunde inte spara: databasen saknar update-policyn tenants_update_own (se supabase/migrations).",
+      );
+    }
     revalidatePath(PROFILE_PATH);
     revalidatePath("/admin");
     return { error: null, success: "Företagsnamnet är sparat." };
@@ -197,35 +203,36 @@ export async function regenerateStaffCode(staffId: string): Promise<FormState> {
 }
 
 /**
- * Tar bort personen. Schemat har ingen "inaktiv"-flagga; personer med
- * fältrapporter kan inte tas bort (on delete restrict) — då är "Ny kod"
- * sättet att stänga av åtkomsten.
+ * Inaktiverar eller återaktiverar en person (staff.active). Inaktiv personal
+ * behåller sin historik och kan återaktiveras när som helst.
  */
-export async function deleteStaff(staffId: string): Promise<FormState> {
+export async function setStaffActive(staffId: string, active: boolean): Promise<FormState> {
   try {
     const { supabase, tenantId } = await requireSession();
     const { data, error } = await supabase
       .from("staff")
-      .delete()
+      .update({ active })
       .eq("id", staffId)
       .eq("tenant_id", tenantId)
       .select("name")
       .maybeSingle();
     if (error) {
-      if (error.code === "23503") {
-        return {
-          error:
-            "Personen har fältrapporter kopplade till sig och kan inte tas bort. Ge personen en ny kod i stället — då slutar den gamla fungera.",
-          success: null,
-        };
-      }
-      throw new Error("Kunde inte ta bort personen. Försök igen.");
+      throw new Error(
+        active
+          ? "Kunde inte aktivera personen. Försök igen."
+          : "Kunde inte inaktivera personen. Försök igen.",
+      );
     }
     if (!data) throw new Error("Personen finns inte längre.");
     revalidatePath(PROFILE_PATH);
-    return { error: null, success: `${data.name} är borttagen.` };
+    return {
+      error: null,
+      success: active
+        ? `${data.name} är aktiv igen och kan rapportera med sin kod.`
+        : `${data.name} är inaktiverad. Koden fungerar inte längre.`,
+    };
   } catch (err) {
-    return fail(err, "Kunde inte ta bort personen.");
+    return fail(err, "Kunde inte ändra personens status.");
   }
 }
 

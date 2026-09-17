@@ -12,18 +12,18 @@ schemat som det är.
   en tenant har. Sidan visar `tenants.settings.plan` om den finns, annars
   "Pilot". Förslag: `tenants.plan text` (eller behåll i `settings` jsonb med
   ett dokumenterat schema) när prissättning finns.
-- **Ingen inaktiv-flagga på staff.** "Återkalla" finns inte som begrepp i
-  schemat. `field_reports.staff_id` är `on delete restrict`, så personer med
-  rapporter kan inte tas bort. Sidan erbjuder därför två saker: **Ny kod**
-  (ogiltigförklarar den gamla direkt, historik bevaras — det rekommenderade
-  sättet att stänga av åtkomst) och **Ta bort** (bara möjligt utan
-  rapporter; annars visas ett tydligt fel som pekar på "Ny kod"). Förslag:
-  `staff.revoked_at timestamptz` + att `/api/faltrapport` avvisar koder för
-  återkallade personer.
-- **tenants har bara select-policy.** Företagsnamnet uppdateras via
-  service-role-klienten efter att sessionens `app_metadata.tenant_id`
-  verifierats (samma mönster som onboarding). Alternativ: lägg till en
-  `tenants_update_own`-policy i schemat så att cookie-klienten räcker.
+- **Löst: `staff.active`.** Kolumnen (default true) finns nu i
+  `supabase/schema.sql` och `lib/types.ts`; kontosidan inaktiverar/
+  återaktiverar i stället för att ta bort. **Kvar att göra (Track 3):**
+  `/api/faltrapport` matchar fortfarande bara på `access_code` och måste
+  lägga till `.eq("active", true)` i staff-uppslaget — annars kan en
+  inaktiverad person fortfarande rapportera. Tills dess är "Ny kod" det
+  som faktiskt stänger av åtkomsten.
+- **Löst: `tenants_update_own`.** Update-policy scopead mot egen tenant.
+  Företagsnamnet sparas nu via cookie-klienten, ingen service-role.
+- **Måste köras manuellt mot det levande projektet:**
+  `supabase/migrations/2026-09-17-track-12-tenants-update-staff-active.sql`
+  (idempotent). schema.sql är uppdaterad för färska databaser.
 - **Ingen tabell för admin-profil** (namn, telefon, roll). Sidan visar det
   Supabase Auth har: e-post, skapad, senast inloggad. E-postbyte går via
   Supabase (bekräftelselänk); lösenordsbyte kräver nuvarande lösenord, som
@@ -41,8 +41,8 @@ schemat som det är.
   (`app/admin/lib/supabaseClient.ts`), vilket med RLS ger noll rader för en
   inloggad admin. Det är utanför Track 12:s scope och lämnas orört, men
   bör bytas till `@supabase/ssr`-browserklienten i `app/auth/lib/supabase/client.ts`.
-- Borttagning av personal kräver ett andra klick ("Ja, ta bort") i raden —
-  ingen `window.confirm`, som blockerar och inte matchar designen.
+- Inaktivering är ett klick (den är reversibel); ingen hård borttagning
+  finns i UI:t längre.
 
 ## Kollegan som ambient närvaro
 
