@@ -101,6 +101,14 @@ to check what's set — values aren't shown, only names), or the app name in
 `fly.toml`'s `app =` line not matching what `fly launch` actually created
 (`fly apps list` to check).
 
+The container runs as the non-root `node` user (see `Dockerfile`) — the
+Agent SDK's internal Claude Code subprocess refuses
+`--dangerously-skip-permissions` when running as root/sudo and exits with
+`Claude Code process exited with code 1`. If you change the Dockerfile,
+keep the `chown -R node:node /app` + `USER node` steps, and `chown` any new
+files/directories you `COPY` in after them so the app can still read them
+at runtime.
+
 ## Redeploying later
 
 ```bash

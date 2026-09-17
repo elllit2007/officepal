@@ -9,9 +9,13 @@ RUN npm run build
 FROM node:22-slim
 WORKDIR /app
 ENV NODE_ENV=production
+ENV HOME=/home/node
 COPY package.json package-lock.json* ./
 RUN npm install --omit=dev
 COPY --from=build /app/dist ./dist
+RUN chown -R node:node /app
+
+USER node
 
 EXPOSE 8787
 CMD ["node", "dist/index.js"]
