@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Kollegan from "@/components/Kollegan";
 import type { KollegState } from "@/components/Kollegan";
@@ -67,6 +67,7 @@ export default function AdminDashboardPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const inFlightRef = useRef(false);
 
   const pendingItems = useMemo(
     () => toPendingItems(invoiceDrafts, quotes),
@@ -85,6 +86,10 @@ export default function AdminDashboardPage() {
       action: "approve" | "reject" | "edit",
       patch?: { customer_name: string; amount: number },
     ) => {
+      // Pratbubblans knappar (Kollegan, Track 5) har ingen disabled-prop, så
+      // dubbelklick under pågående anrop stoppas här istället.
+      if (inFlightRef.current) return;
+      inFlightRef.current = true;
       setBusyId(target.id);
       setActionError(null);
       try {
@@ -113,6 +118,7 @@ export default function AdminDashboardPage() {
       } catch (err) {
         setActionError(err instanceof Error ? err.message : "Något gick fel.");
       } finally {
+        inFlightRef.current = false;
         setBusyId(null);
       }
     },
