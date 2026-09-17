@@ -18,6 +18,11 @@ export default function KolleganDemoPage() {
   );
   const [log, setLog] = useState<string[]>([]);
 
+  const SHORT_MESSAGE =
+    "Fakturautkast till Björkvägen 12 (2 450 kr) väntar på godkännande.";
+  const LONG_MESSAGE =
+    "Fakturautkast till Björkvägen 12 väntar på godkännande. Beloppet är 2 450 kr och inkluderar fönsterputs, storstädning och en extra timme för balkongen. Ninas team rapporterade att kunden också bad om en offert på återkommande städning varannan vecka.";
+
   const pushLog = (entry: string) => {
     const time = new Date().toLocaleTimeString("sv-SE");
     setLog((prev) => [`${time} — ${entry}`, ...prev].slice(0, 8));
@@ -60,12 +65,28 @@ export default function KolleganDemoPage() {
           rows={2}
           className="border border-[#DBEAFE] rounded-lg p-2 text-sm"
         />
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setMessage(SHORT_MESSAGE)}
+            className="px-3 py-1 rounded-full text-xs font-medium border border-[#DBEAFE] text-[#1E3A8A] hover:border-[#2563EB]"
+          >
+            Kort meddelande
+          </button>
+          <button
+            type="button"
+            onClick={() => setMessage(LONG_MESSAGE)}
+            className="px-3 py-1 rounded-full text-xs font-medium border border-[#DBEAFE] text-[#1E3A8A] hover:border-[#2563EB]"
+          >
+            Långt meddelande (2-3 meningar)
+          </button>
+        </div>
       </section>
 
-      <section className="flex flex-col gap-16">
+      <section className="flex flex-col gap-10">
         <div className="flex items-center gap-4">
-          <span className="w-24 text-sm text-neutral-500">Large (dashboard)</span>
-          <div className="min-h-[200px] flex items-center">
+          <span className="w-24 text-sm text-neutral-500 shrink-0">Large (dashboard)</span>
+          <div className="min-h-[260px] flex items-center">
             <Kollegan
               state={state}
               size="large"
@@ -78,8 +99,8 @@ export default function KolleganDemoPage() {
         </div>
 
         <div className="flex items-center gap-4">
-          <span className="w-24 text-sm text-neutral-500">Small (badge)</span>
-          <div className="min-h-[80px] flex items-center">
+          <span className="w-24 text-sm text-neutral-500 shrink-0">Small</span>
+          <div className="min-h-[220px] flex items-center">
             <Kollegan
               state={state}
               size="small"
@@ -87,6 +108,20 @@ export default function KolleganDemoPage() {
               onApprove={() => pushLog("Godkänt (small)")}
               onEdit={() => pushLog("Redigera (small)")}
               onReject={() => pushLog("Avvisat (small)")}
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <span className="w-24 text-sm text-neutral-500 shrink-0">Tiny (hörnbadge, ~48px)</span>
+          <div className="min-h-[200px] flex items-center">
+            <Kollegan
+              state={state}
+              size="tiny"
+              message={message}
+              onApprove={() => pushLog("Godkänt (tiny)")}
+              onEdit={() => pushLog("Redigera (tiny)")}
+              onReject={() => pushLog("Avvisat (tiny)")}
             />
           </div>
         </div>
