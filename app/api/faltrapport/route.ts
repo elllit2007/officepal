@@ -79,10 +79,15 @@ export async function POST(request: Request) {
   // access_code är unik per tenant (inte globalt, se schema.sql), men i
   // Nina-piloten finns bara en tenant. Tar första träffen om koden mot
   // förmodan skulle finnas i flera tenants.
+  //
+  // active = true krävs också — se staff.active i schema.sql. En kod till
+  // en inaktiverad medarbetare ska ge samma generiska felmeddelande som en
+  // felaktig kod, så att svaret inte läcker vilka koder som existerar.
   const { data: staffData, error: staffError } = await supabase
     .from("staff")
     .select("id, tenant_id, name")
     .eq("access_code", accessCode)
+    .eq("active", true)
     .limit(1)
     .maybeSingle();
 

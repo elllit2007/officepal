@@ -39,6 +39,18 @@ function getServiceClient() {
 }
 
 export async function POST(request: Request) {
+  const authClient = await createServerAuthClient();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json(
+      { error: "Du måste vara inloggad för att godkänna eller avvisa." },
+      { status: 401 },
+    );
+  }
+
   let body: Partial<ApprovalRequestBody>;
   try {
     body = await request.json();
@@ -95,18 +107,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  const authClient = await createServerAuthClient();
-  const {
-    data: { user },
-  } = await authClient.auth.getUser();
-
   try {
     await submitApproval({
       tenant_id: tenantId,
       target_type: targetType,
       target_id: targetId,
       action: action === "approve" ? "approved" : "rejected",
-      decided_by: user?.id ?? null,
+      decided_by: user.id,
     });
   } catch (err) {
     console.error(err);
