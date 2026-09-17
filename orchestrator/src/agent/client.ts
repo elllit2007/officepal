@@ -78,6 +78,15 @@ export async function runFieldReportAgent(
   let summary = "";
   let turns = 0;
 
+  // Instrumentation for the "why does this take ~25s" investigation: log
+  // every message the SDK's underlying Claude Code subprocess emits, with
+  // elapsed-since-start and delta-since-previous-message, so we can see how
+  // many sequential Claude API turns happen per request and how long each
+  // one takes (as opposed to time spent in tool execution / Supabase I/O,
+  // which is logged separately at each call site via lib/timing.ts).
+  const agentStart = performance.now();
+  let lastMessageAt = agentStart;
+
   for await (const message of query({
     prompt,
     options: {
@@ -104,6 +113,23 @@ export async function runFieldReportAgent(
       maxTurns: 12,
     },
   })) {
+    const now = performance.now();
+    const toolUses =
+      message.type === "assistant"
+        ? message.message.content
+            .map((block) => (block.type === "tool_use" ? block.name : null))
+            .filter((name): name is string => name !== null)
+        : undefined;
+
+    logger.info("timing: agent message", {
+      field_report_id: input.fieldReportId,
+      message_type: message.type,
+      ...(toolUses ? { tool_uses: toolUses } : {}),
+      since_start_ms: Math.round(now - agentStart),
+      since_previous_ms: Math.round(now - lastMessageAt),
+    });
+    lastMessageAt = now;
+
     if (message.type === "assistant") {
       turns += 1;
     }
@@ -115,6 +141,12 @@ export async function runFieldReportAgent(
       }
     }
   }
+
+  logger.info("timing: agent run total", {
+    field_report_id: input.fieldReportId,
+    turns,
+    ms: Math.round(performance.now() - agentStart),
+  });
 
   return { summary, turns };
 }

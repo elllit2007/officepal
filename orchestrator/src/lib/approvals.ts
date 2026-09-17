@@ -1,5 +1,6 @@
 import { supabase } from "./supabase.js";
 import { logger } from "./logger.js";
+import { timed } from "./timing.js";
 import type { ApprovalAction } from "../types.js";
 
 export interface LogDecisionInput {
@@ -24,13 +25,18 @@ export interface LogDecisionInput {
  * 'rejected' decision — a full two-row trail per gated write.
  */
 export async function logDecision(input: LogDecisionInput): Promise<void> {
-  const { error } = await supabase.from("approvals").insert({
-    tenant_id: input.tenantId,
-    target_type: input.targetType,
-    target_id: input.targetId,
-    action: input.action,
-    decided_by: input.decidedBy,
-  });
+  const { error } = await timed(
+    "supabase: approvals insert",
+    { tenant_id: input.tenantId, target_type: input.targetType },
+    () =>
+      supabase.from("approvals").insert({
+        tenant_id: input.tenantId,
+        target_type: input.targetType,
+        target_id: input.targetId,
+        action: input.action,
+        decided_by: input.decidedBy,
+      }),
+  );
 
   if (error) {
     // The approvals insert is the audit trail, not the primary write — the

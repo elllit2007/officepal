@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import { supabase } from "../lib/supabase.js";
 import { logger } from "../lib/logger.js";
+import { timed } from "../lib/timing.js";
 import { runFieldReportAgent } from "../agent/client.js";
 
 const bodySchema = z.object({
@@ -14,6 +15,7 @@ const bodySchema = z.object({
 });
 
 export async function processReport(req: Request, res: Response) {
+  const requestStart = performance.now();
   const parsed = bodySchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "invalid_body", details: parsed.error.flatten() });
@@ -24,6 +26,7 @@ export async function processReport(req: Request, res: Response) {
   let rawText = raw_text;
 
   if (reportId) {
+    const claimId = reportId; // narrow once; TS doesn't narrow captures inside the timed() closures below
     // Atomic claim: flip pending -> processed only if it's still pending, in
     // the same statement as the read. A plain "read status, then decide"
     // check has a race — two concurrent /process-report calls for the same
@@ -32,23 +35,33 @@ export async function processReport(req: Request, res: Response) {
     // The conditional `.eq("status", "pending")` means only one concurrent
     // request can actually match a row; the loser gets null back. If the
     // agent run below throws, the catch block overwrites this to "error".
-    const { data: claimed, error: claimError } = await supabase
-      .from("field_reports")
-      .update({ status: "processed" })
-      .eq("id", reportId)
-      .eq("tenant_id", tenant_id)
-      .eq("status", "pending")
-      .select("id, raw_text")
-      .maybeSingle();
+    const { data: claimed, error: claimError } = await timed(
+      "supabase: field_reports claim update",
+      { field_report_id: claimId },
+      () =>
+        supabase
+          .from("field_reports")
+          .update({ status: "processed" })
+          .eq("id", claimId)
+          .eq("tenant_id", tenant_id)
+          .eq("status", "pending")
+          .select("id, raw_text")
+          .maybeSingle(),
+    );
 
     if (claimError) return res.status(500).json({ error: "lookup_failed", message: claimError.message });
 
     if (!claimed) {
-      const { data: existing, error: fetchError } = await supabase
-        .from("field_reports")
-        .select("id, tenant_id, status")
-        .eq("id", reportId)
-        .maybeSingle();
+      const { data: existing, error: fetchError } = await timed(
+        "supabase: field_reports lookup (claim missed)",
+        { field_report_id: claimId },
+        () =>
+          supabase
+            .from("field_reports")
+            .select("id, tenant_id, status")
+            .eq("id", claimId)
+            .maybeSingle(),
+      );
 
       if (fetchError) return res.status(500).json({ error: "lookup_failed", message: fetchError.message });
       if (!existing) return res.status(404).json({ error: "field_report_not_found" });
@@ -63,22 +76,39 @@ export async function processReport(req: Request, res: Response) {
     if (!rawText) {
       return res.status(400).json({ error: "invalid_body", details: "raw_text is required when field_report_id is omitted" });
     }
-    const { data: inserted, error } = await supabase
-      .from("field_reports")
-      .insert({ tenant_id, staff_id, raw_text: rawText })
-      .select("id")
-      .single();
+    const rawTextToInsert = rawText;
+    const { data: inserted, error } = await timed(
+      "supabase: field_reports insert",
+      { tenant_id },
+      () =>
+        supabase
+          .from("field_reports")
+          .insert({ tenant_id, staff_id, raw_text: rawTextToInsert })
+          .select("id")
+          .single(),
+    );
 
     if (error) return res.status(500).json({ error: "insert_failed", message: error.message });
     reportId = inserted.id;
   }
 
   try {
-    const result = await runFieldReportAgent({
-      tenantId: tenant_id,
-      staffId: staff_id,
-      fieldReportId: reportId,
-      rawText: rawText!,
+    const result = await timed(
+      "agent: runFieldReportAgent",
+      { field_report_id: reportId },
+      () =>
+        runFieldReportAgent({
+          tenantId: tenant_id,
+          staffId: staff_id,
+          fieldReportId: reportId!,
+          rawText: rawText!,
+        }),
+    );
+
+    logger.info("process-report: request complete", {
+      field_report_id: reportId,
+      turns: result.turns,
+      total_ms: Math.round(performance.now() - requestStart),
     });
 
     return res.status(200).json({
@@ -90,9 +120,12 @@ export async function processReport(req: Request, res: Response) {
     logger.error("process-report: agent run failed", {
       field_report_id: reportId,
       error: err instanceof Error ? err.message : String(err),
+      total_ms: Math.round(performance.now() - requestStart),
     });
 
-    await supabase.from("field_reports").update({ status: "error" }).eq("id", reportId);
+    await timed("supabase: field_reports mark error", { field_report_id: reportId }, () =>
+      supabase.from("field_reports").update({ status: "error" }).eq("id", reportId),
+    );
 
     return res.status(502).json({
       error: "agent_run_failed",

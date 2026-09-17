@@ -1,6 +1,7 @@
 import { tool } from "@anthropic-ai/claude-agent-sdk";
 import { supabase } from "../lib/supabase.js";
 import { logger } from "../lib/logger.js";
+import { timed } from "../lib/timing.js";
 import { extractFieldReportInput } from "./schemas.js";
 
 /**
@@ -18,11 +19,16 @@ export const extractFieldReportTool = tool(
   "Persist the structured extraction of a field report's raw text. Call this exactly once per report, after reading raw_text and reasoning out its structured fields. Never invent a price or amount — there is no field for one.",
   extractFieldReportInput,
   async (args) => {
-    const { data: existing, error: fetchError } = await supabase
-      .from("field_reports")
-      .select("id, tenant_id")
-      .eq("id", args.field_report_id)
-      .maybeSingle();
+    const { data: existing, error: fetchError } = await timed(
+      "supabase: extract_field_report lookup",
+      { field_report_id: args.field_report_id },
+      () =>
+        supabase
+          .from("field_reports")
+          .select("id, tenant_id")
+          .eq("id", args.field_report_id)
+          .maybeSingle(),
+    );
 
     if (fetchError) {
       throw new Error(`extract_field_report: lookup failed: ${fetchError.message}`);
@@ -34,12 +40,17 @@ export const extractFieldReportTool = tool(
       throw new Error("extract_field_report: tenant_id does not match field_report");
     }
 
-    const { data: updated, error: updateError } = await supabase
-      .from("field_reports")
-      .update({ extracted: args.structured, status: "processed" })
-      .eq("id", args.field_report_id)
-      .select()
-      .single();
+    const { data: updated, error: updateError } = await timed(
+      "supabase: extract_field_report update",
+      { field_report_id: args.field_report_id },
+      () =>
+        supabase
+          .from("field_reports")
+          .update({ extracted: args.structured, status: "processed" })
+          .eq("id", args.field_report_id)
+          .select()
+          .single(),
+    );
 
     if (updateError) {
       throw new Error(`extract_field_report: update failed: ${updateError.message}`);

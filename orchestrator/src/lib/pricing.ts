@@ -1,4 +1,5 @@
 import { supabase } from "./supabase.js";
+import { timed } from "./timing.js";
 
 /**
  * "Inget pris genereras fritt av AI — alltid uppslag mot strukturerad, av
@@ -33,11 +34,11 @@ function extractPriceList(settings: Record<string, unknown>): PriceList {
 }
 
 export async function getTenantPriceList(tenantId: string): Promise<PriceList> {
-  const { data, error } = await supabase
-    .from("tenants")
-    .select("settings")
-    .eq("id", tenantId)
-    .maybeSingle();
+  const { data, error } = await timed(
+    "supabase: tenants price_list lookup",
+    { tenant_id: tenantId },
+    () => supabase.from("tenants").select("settings").eq("id", tenantId).maybeSingle(),
+  );
 
   if (error) {
     throw new Error(`pricing: failed to load tenant settings: ${error.message}`);

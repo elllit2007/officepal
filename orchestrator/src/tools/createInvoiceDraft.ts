@@ -1,6 +1,7 @@
 import { tool } from "@anthropic-ai/claude-agent-sdk";
 import { supabase } from "../lib/supabase.js";
 import { logger } from "../lib/logger.js";
+import { timed } from "../lib/timing.js";
 import { checkTrustLevel, isAutonomous } from "../lib/trust.js";
 import { getTenantPriceList, lookupUnitPrice } from "../lib/pricing.js";
 import { createInvoiceDraftInput } from "./schemas.js";
@@ -57,19 +58,24 @@ export const createInvoiceDraftTool = tool(
     const autonomous = isAutonomous(level);
     const status = autonomous ? "approved" : "awaiting_approval";
 
-    const { data: invoiceDraft, error } = await supabase
-      .from("invoice_drafts")
-      .insert({
-        tenant_id: args.tenant_id,
-        field_report_id: args.field_report_id ?? null,
-        customer_name: args.customer_name,
-        customer_email: args.customer_email ?? null,
-        amount,
-        line_items: pricedItems,
-        status,
-      })
-      .select()
-      .single();
+    const { data: invoiceDraft, error } = await timed(
+      "supabase: invoice_drafts insert",
+      { tenant_id: args.tenant_id },
+      () =>
+        supabase
+          .from("invoice_drafts")
+          .insert({
+            tenant_id: args.tenant_id,
+            field_report_id: args.field_report_id ?? null,
+            customer_name: args.customer_name,
+            customer_email: args.customer_email ?? null,
+            amount,
+            line_items: pricedItems,
+            status,
+          })
+          .select()
+          .single(),
+    );
 
     if (error) {
       throw new Error(`create_invoice_draft: insert failed: ${error.message}`);

@@ -1,6 +1,7 @@
 import { tool } from "@anthropic-ai/claude-agent-sdk";
 import { supabase } from "../lib/supabase.js";
 import { logger } from "../lib/logger.js";
+import { timed } from "../lib/timing.js";
 import { checkTrustLevel, isAutonomous } from "../lib/trust.js";
 import { createQuoteDraftInput } from "./schemas.js";
 
@@ -22,20 +23,25 @@ export const createQuoteDraftTool = tool(
     const level = await checkTrustLevel(args.tenant_id, QUOTE_TASK_TYPE);
     const autonomous = isAutonomous(level);
 
-    const { data: quote, error } = await supabase
-      .from("quotes")
-      .insert({
-        tenant_id: args.tenant_id,
-        customer_name: args.customer_name,
-        customer_email: args.customer_email ?? null,
-        content: args.content,
-        // quotes has no "awaiting_approval" status distinct from "draft" —
-        // the trust decision is recorded separately via the approvals hook,
-        // not by a quotes.status transition. See src/lib/approvals.ts.
-        status: "draft",
-      })
-      .select()
-      .single();
+    const { data: quote, error } = await timed(
+      "supabase: quotes insert",
+      { tenant_id: args.tenant_id },
+      () =>
+        supabase
+          .from("quotes")
+          .insert({
+            tenant_id: args.tenant_id,
+            customer_name: args.customer_name,
+            customer_email: args.customer_email ?? null,
+            content: args.content,
+            // quotes has no "awaiting_approval" status distinct from "draft" —
+            // the trust decision is recorded separately via the approvals hook,
+            // not by a quotes.status transition. See src/lib/approvals.ts.
+            status: "draft",
+          })
+          .select()
+          .single(),
+    );
 
     if (error) {
       throw new Error(`create_quote_draft: insert failed: ${error.message}`);

@@ -1,4 +1,5 @@
 import { supabase } from "./supabase.js";
+import { timed } from "./timing.js";
 import type { TrustLevel } from "../types.js";
 
 const DEFAULT_TRUST_LEVEL: TrustLevel = "ask_always";
@@ -12,12 +13,17 @@ export async function checkTrustLevel(
   tenantId: string,
   taskType: string,
 ): Promise<TrustLevel> {
-  const { data, error } = await supabase
-    .from("trust_settings")
-    .select("level")
-    .eq("tenant_id", tenantId)
-    .eq("task_type", taskType)
-    .maybeSingle();
+  const { data, error } = await timed(
+    "supabase: trust_settings lookup",
+    { tenant_id: tenantId, task_type: taskType },
+    () =>
+      supabase
+        .from("trust_settings")
+        .select("level")
+        .eq("tenant_id", tenantId)
+        .eq("task_type", taskType)
+        .maybeSingle(),
+  );
 
   if (error) {
     throw new Error(`check_trust_level: query failed: ${error.message}`);
