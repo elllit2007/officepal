@@ -48,7 +48,7 @@ export default function Kollegan({
 
   return (
     <div
-      className={`${styles.wrapper} ${size === "small" ? styles.small : styles.large} ${className ?? ""}`}
+      className={`${styles.wrapper} ${styles[size]} ${className ?? ""}`}
     >
       <motion.svg
         className={styles.figure}

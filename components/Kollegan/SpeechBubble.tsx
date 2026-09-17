@@ -21,7 +21,13 @@ export default function SpeechBubble({
 }: SpeechBubbleProps) {
   return (
     <motion.div
-      className={`${styles.speechBubble} ${size === "small" ? styles.speechBubbleSmall : ""}`}
+      className={`${styles.speechBubble} ${
+        size === "tiny"
+          ? styles.speechBubbleTiny
+          : size === "small"
+            ? styles.speechBubbleSmall
+            : ""
+      }`}
       initial={{ opacity: 0, scale: 0.85, x: -8 }}
       animate={{ opacity: 1, scale: 1, x: 0 }}
       exit={{ opacity: 0, scale: 0.85, x: -8 }}
